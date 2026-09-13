@@ -91,10 +91,25 @@
       <div id="resultPanel" class="hidden">
         <div id="resultMsg" class="result-msg"></div>
         <div class="result-actions">
+          <button id="cobaltFallbackBtn" class="btn btn-primary hidden">Download via cobalt.tools (guaranteed)</button>
           <button id="downloadAgainBtn" class="btn">New download</button>
         </div>
       </div>
     </section>
+
+    <!-- BACKEND STATUS & SETTINGS (cobalt v11 auth) -->
+    <details class="panel backend-panel" id="backendPanel">
+      <summary>Backend status &amp; settings</summary>
+      <div class="backend-box">
+        <div class="backend-status" id="backendStatus">// checking backends... //</div>
+        <div class="backend-row">
+          <input type="text" id="cobaltKeyInput" class="input" placeholder="Cobalt API key (optional — sk_...)" autocomplete="off" spellcheck="false">
+          <button id="saveKeyBtn" class="btn btn-small">Save</button>
+        </div>
+        <div class="term-note" id="keyNote"></div>
+        <div class="term-note dim-note">Cloudflare Turnstile runs invisibly in the background to create the free Cobalt session. If your browser blocks it, add your own free Cobalt API key above, or use the cobalt.tools fallback button that appears on errors.</div>
+      </div>
+    </details>
 
     <!-- HOW TO -->
     <section class="panel">
@@ -143,6 +158,10 @@
 
 <!-- toast -->
 <div id="toast" class="toast hidden"></div>
+
+<!-- Cloudflare Turnstile container (cobalt session auth — invisible/offscreen) -->
+<div id="turnstile-widget" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
+<div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
   <span>ytdownloader v1.1 · built by <b>dvc</b> · 100% free · supported by your donations</span>

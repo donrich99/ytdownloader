@@ -585,3 +585,50 @@ body {
   .header-icon { width: 34px; height: 34px; }
   .core-panel { padding: 12px 16px; }
 }
+
+/* ═══════════ BACKEND SETTINGS PANEL (cobalt v11) ═══════════ */
+.backend-panel {
+  font-size: 13px;
+}
+.backend-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--fg);
+  padding: 6px 0;
+  user-select: none;
+  outline: none;
+}
+.backend-panel summary::marker { color: var(--red); }
+.backend-box { margin-top: 10px; }
+.backend-status { margin-bottom: 10px; }
+.backend-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.backend-row.detail {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  padding: 4px 0;
+  border-bottom: 1px dashed #eee;
+  font-size: 12.5px;
+}
+.backend-k { color: var(--fg2); flex: 0 0 auto; }
+.backend-v { font-weight: 600; text-align: right; word-break: break-all; }
+.backend-v.green { color: var(--green); }
+.backend-v.red   { color: var(--red-dark); }
+.backend-v.yellow { color: #b8860b; }
+.backend-v.dim   { color: var(--fg2); font-weight: 400; }
+.dim-note { color: var(--fg2); font-size: 12px; line-height: 1.5; margin-top: 8px; }
+.btn-small {
+  padding: 10px 14px !important;
+  font-size: 13px !important;
+  background: var(--red);
+  color: #fff;
+}
+#cobaltFallbackBtn {
+  width: 100%;
+  margin-bottom: 6px;
+}
+#keyNote { font-size: 12px; }

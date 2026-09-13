@@ -81,12 +81,81 @@ document.addEventListener('DOMContentLoaded', () => {
     el.className = 'term-note ' + (cls || '');
   }
 
-  /* ── SETTINGS (cobalt key only) ── */
+  /* ── SETTINGS (cobalt key + turnstile auto-session) ── */
   function getSettings() {
     let cobaltKey = '';
-    try { cobaltKey = localStorage.getItem('ytdl_cobalt_key') || ''; } catch (e) {}
+    try { cobaltKey = localStorage.getItem('ytd_cobalt_key') || ''; } catch (e) {}
     return { cobaltKey };
   }
+
+  function saveCobaltKey(k) {
+    try {
+      localStorage.setItem('ytd_cobalt_key', (k || '').trim());
+      YTD.setCobaltKey(k);
+    } catch (e) {}
+    toast('Cobalt API key saved (sk_…)');
+    renderBackendStatus();
+  }
+
+  const keyInput = $('#cobaltKeyInput');
+  const saveKeyBtn = $('#saveKeyBtn');
+
+  async function renderBackendStatus() {
+    const el = $('#backendStatus');
+    if (!el) return;
+    const info = YTD._serverInfo;
+    el.innerHTML = '';
+
+    const add = (k, v, cls) => {
+      const row = document.createElement('div');
+      row.className = 'backend-row detail';
+      row.innerHTML = '<span class="backend-k">' + esc(k) + '</span><span class="backend-v ' + (cls || '') + '">' + esc(v) + '</span>';
+      el.appendChild(row);
+    };
+
+    if (!info) {
+      add('cobalt server', 'unreachable', 'red');
+      add('auth', YTD.cobaltAuthStatus(), 'yellow');
+      add('hint', 'The cobalt API is currently unreachable — downloads will fall back to the cobalt web helper.', 'dim');
+      return;
+    }
+
+    const c = info.cobalt || {};
+    const ver = info.cobalt ? ('v' + (String(info.cobalt.version || '').replace(/^v/, ''))) : 'unknown';
+    add('cobalt server', ver + ' · ' + (YTD.COBALT_API || '').replace(/^https?:\/\//, ''), 'green');
+    add('turnstile sitekey', (c.turnstileSitekey ? c.turnstileSitekey.slice(0, 10) + '…' : 'absent'), 'dim');
+    if (YTD.hasCobaltKey()) {
+      add('custom Api-Key', 'configured ✓', 'green');
+      add('auth', 'direct (using your key)', 'green');
+    } else if (YTD._captchaToken) {
+      add('auth', 'session ready (turnstile)', 'green');
+      add('turnstile', 'solved ✓', 'green');
+    } else if (YTD._turnstileErr && String(YTD._turnstileErr).startsWith('103')) {
+      add('turnstile', 'blocked on this domain — use Api-Key or web helper', 'red');
+    } else {
+      add('auth', YTD.cobaltAuthStatus(), 'yellow');
+    }
+  }
+
+  async function initCobalt() {
+    try { await YTD.getCobaltServerInfo(); } catch (e) {}
+    /* pre-fill saved key */
+    const saved = YTD.getCobaltKey();
+    if (saved) keyInput.value = saved;
+    renderBackendStatus();
+    /* turnstile solves session automatically for cobalt auth */
+    if (!YTD.hasCobaltKey()) {
+      try { YTD.initTurnstile(); } catch (e) {}
+    }
+    /* probe result hook */
+    $('#cobaltFallbackBtn').addEventListener('click', () => {
+      const u = urlInput.value.trim() || (state.resolved && state.resolved.url);
+      if (u) YTD.openCobaltWeb(u, 'auto');
+    });
+  }
+
+  saveKeyBtn.addEventListener('click', () => saveCobaltKey(keyInput.value));
+  keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCobaltKey(keyInput.value); });
 
   /* ── FETCH / RESOLVE ── */
   const resolveBtn = $('#resolveBtn');
@@ -122,8 +191,17 @@ document.addEventListener('DOMContentLoaded', () => {
       hide($('#videoInfo'));
       hide($('#qualityPanel'));
       $('#resultMsg').className = 'result-msg';
-      $('#resultMsg').innerHTML = '<b>Unable to resolve that link.</b><div class="dim">' + esc(err.message) +
+      let msg = '<b>Unable to resolve that link.</b><div class="dim">' + esc(err.message) +
         '<br><br>Tips: check your internet connection · paste the full YouTube link · or try a direct .mp4 link.</div>';
+      if (err.cobaltFallback) {
+        msg = '<b>All direct backends are currently out of reach.</b><div class="dim">' +
+          esc(err.message) +
+          '<br><br>Use the <b>cobalt.tools</b> helper on the right — it opens the official Cobalt downloader with your link pre-loaded, solves its own captcha automatically, and saves your file. (100% free, no account needed.)</div>';
+        show($('#cobaltFallbackBtn'));
+      } else {
+        hide($('#cobaltFallbackBtn'));
+      }
+      $('#resultMsg').innerHTML = msg;
       show($('#resultPanel'));
       setStatus('error', 'err');
     } finally {
@@ -419,6 +497,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide($('#videoInfo'));
     hide($('#qualityPanel'));
     hide($('#progressPanel'));
+    hide($('#cobaltFallbackBtn'));
     state.resolved = null;
     state.activeQuality = null;
     urlInput.value = '';
@@ -433,5 +512,6 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ── INIT ── */
+  initCobalt();
   runBoot();
 });

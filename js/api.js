@@ -1,19 +1,25 @@
 /* ═══════════════════════════════════════════════════════════
-   API.JS — backend engine for ytdownloader (v2.1 PARALLEL)
+   API.JS — backend engine for ytdownloader (v2.2 COBALT V11)
    MULTI-BACKEND PARALLEL RESOLVER:
-     1. Piped API     — many instances, ALL tried at once
-     2. Invidious API — many instances, ALL tried at once (audio!)
-     3. Cobalt        — merge fallback
-     4. jina proxy    — r.jina.ai CORS proxy layer (browser-safe)
+     1. Cobalt v11    — ★ THE only living backend in 2026 ★
+        (session auth via Cloudflare Turnstile, or custom Api-Key)
+     2. Piped API     — legacy instances, ALL tried at once
+     3. Invidious API — legacy instances, ALL tried at once
+     4. jina proxy    — r.jina.ai CORS read-proxy layer
      5. Direct URL    — plain mp4/webm/audio links
    KEY FIX (v2.1): instances are probed IN PARALLEL so the
-   first working server wins within seconds (sequential probe
-   previously could take 100s+ and show only cryptic timeouts).
+   first working server wins within seconds.
+   KEY UPGRADE (v2.2): in 2026 ALL public Piped/Invidious
+   instances are dead. The only living backend is Cobalt v11
+   (api.cobalt.tools, needs session Bearer token obtained via
+   Cloudflare Turnstile, or an Api-Key). If no auth is present,
+   the app falls back to opening cobalt.tools/?u=… (web UI,
+   which auto-solves its own Turnstile) so downloads ALWAYS work.
    ═══════════════════════════════════════════════════════════ */
 'use strict';
 
 const YTD = {
-  VERSION: '2.1.0',
+  VERSION: '2.2.0',
 
   /* ── backend instance pools ── */
   PIPED_INSTANCES: [
@@ -53,6 +59,19 @@ const YTD = {
     'https://cobalt-api.marcsello.org',
     'https://api.cobalt.best'
   ],
+
+  /* cobalt v11 (2026) — the living backend */
+  COBALT_API: 'https://api.cobalt.tools',
+  COBALT_WEB: 'https://cobalt.tools',
+  TURNSTILE_SCRIPT: 'https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit',
+
+  /* runtime caches for cobalt v11 */
+  _serverInfo: null,
+  _session: null,
+  _captchaToken: null,
+  _turnstileReady: false,
+  _turnstileOk: false,
+  _turnstileErr: null,
 
   /* extra network path: r.jina.ai is a CORS-enabled read proxy */
   JINA_PREFIX: 'https://r.jina.ai/',
@@ -399,6 +418,186 @@ const YTD = {
     });
   },
 
+  /* ═══════════════════════════════════════════════
+     COBALT v11 (2026) — the only living backend
+     Auth flow (mirrors the official web UI):
+       1) Cloudflare Turnstile widget renders → token
+       2) POST /session  {cf-turnstile-response} → {token, exp}
+       3) POST /         Authorization: Bearer {token}
+       4) …or direct:    Authorization: Api-Key {sk_…}
+     ═══════════════════════════════════════════════ */
+
+  /* GET / → {cobalt:{version, turnstileSitekey, services…}} */
+  async getCobaltServerInfo(force = false) {
+    if (!force && YTD._serverInfo) return YTD._serverInfo;
+    try {
+      const data = await YTD.fetchJson(YTD.COBALT_API + '/', 12000);
+      if (data && data.cobalt && data.cobalt.turnstileSitekey) {
+        YTD._serverInfo = data;
+        return data;
+      }
+    } catch (e) { /* keep null */ }
+    return YTD._serverInfo;
+  },
+
+  /* load + init the Cloudflare Turnstile widget (explicit mode) */
+  initTurnstile(callback) {
+    if (YTD._turnstileReady) { if (callback) callback(YTD._captchaToken); return; }
+    const info = YTD._serverInfo;
+    if (!info) return;
+    const sitekey = info.cobalt.turnstileSitekey;
+    if (!sitekey) return;
+
+    const done = () => {
+      const el = document.getElementById('turnstile-widget');
+      if (!el || !window.turnstile) return;
+      window.turnstile.render(el, {
+        sitekey,
+        size: 'invisible',
+        'refresh-expired': 'auto',
+        callback: (token) => {
+          YTD._captchaToken = token;
+          YTD._turnstileOk = true;
+          try {
+            const s = window.localStorage || {};
+            // keep token session-scoped only; do not persist tokens
+          } catch (e) {}
+          if (callback) callback(token);
+        },
+        'error-callback': (code) => {
+          YTD._turnstileErr = code;
+          YTD._turnstileOk = false;
+          if (callback) callback(null);
+        },
+        'expired-callback': () => {
+          YTD._captchaToken = null;
+          YTD._turnstileOk = false;
+          try { window.turnstile.reset(el); } catch (e) {}
+        }
+      });
+    };
+
+    YTD._turnstileReady = true;
+    if (window.turnstile) { done(); return; }
+    const s = document.createElement('script');
+    s.src = YTD.TURNSTILE_SCRIPT;
+    s.async = true;
+    s.defer = true;
+    s.onload = done;
+    document.head.appendChild(s);
+  },
+
+  /* POST /session with the turnstile token → {token, exp} */
+  async requestCobaltSession(token) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 12000);
+    try {
+      const resp = await fetch(YTD.COBALT_API + '/session', {
+        method: 'POST',
+        redirect: 'manual',
+        signal: ctrl.signal,
+        headers: token ? { 'cf-turnstile-response': token } : {}
+      });
+      clearTimeout(t);
+      const txt = await resp.text();
+      try { return JSON.parse(txt); } catch (e) { throw new Error('session bad json'); }
+    } catch (e) {
+      clearTimeout(t);
+      throw e;
+    }
+  },
+
+  /* cached session (Bearer token with expiry) */
+  async getCobaltSession(captchaToken) {
+    const now = Date.now();
+    if (YTD._session && YTD._session.expiresAt > now + 5000) return YTD._session;
+    const data = await YTD.requestCobaltSession(captchaToken);
+    if (!data || data.status === 'error') {
+      const code = data && data.error && data.error.code;
+      throw new Error('cobalt session: ' + (code || 'failed'));
+    }
+    if (!data.token) throw new Error('cobalt session: no token');
+    YTD._session = {
+      token: data.token,
+      expiresAt: now + (data.exp || 600) * 1000
+    };
+    return YTD._session;
+  },
+
+  /* the v11 download call → parsed result
+     opts: {customKey, captchaToken, mode:'auto'|'audio', videoQuality, audioFormat,
+            audioBitrate, knownTitle} */
+  async probeCobaltV11(url, opts = {}) {
+    const payload = {
+      url,
+      downloadMode: opts.mode || 'auto',
+      videoQuality: opts.videoQuality || '720',
+      filenameStyle: 'basic',
+      disableMetadata: false
+    };
+    if ((opts.mode || 'auto') === 'audio') {
+      payload.audioFormat = opts.audioFormat || 'mp3';
+      payload.audioBitrate = opts.audioBitrate || '128';
+    }
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (opts.customKey) {
+      headers['Authorization'] = 'Api-Key ' + opts.customKey;
+    } else {
+      const session = await YTD.getCobaltSession(opts.captchaToken);
+      headers['Authorization'] = 'Bearer ' + session.token;
+    }
+
+    const data = await YTD.fetchJson(YTD.COBALT_API + '/', 15000, {
+      method: 'POST', body: JSON.stringify(payload), headers
+    });
+
+    if (data.status === 'error') {
+      throw new Error((data.error && data.error.code) || 'cobalt error');
+    }
+    if (data.status === 'tunnel') {
+      // streaming tunnel needs WebCodecs/MediaSource — hand off to web UI
+      const err = new Error('tunnel');
+      err.tunnel = data;
+      throw err;
+    }
+    if (!data.url) throw new Error('cobalt: no url');
+
+    const ytId = YTD.extractYtId(url);
+    const filename = (data.filename || 'yt download').replace(/\.[^.]+$/, '');
+    const mime = data.mimeType || 'video/mp4';
+
+    // success mode (separate audio) → extra audio quality
+    const quals = [YTD.qVideo(
+      data.quality || 'Best',
+      'via cobalt · ' + (data.quality || 'best') + (mime.includes('audio') ? '' : ' ' + mime),
+      data.url, data.size || null, mime, 'cobalt-v11'
+    )];
+    if (data.audio && data.audio.url) {
+      quals.push(YTD.qAudio(
+        'Audio only (mp3)',
+        'audio stream · ' + (data.audio.size ? Math.round(data.audio.size / 1024 / 1024 * 10) / 10 + ' MB' : '') ,
+        data.audio.url, data.audio.size || null, 'audio/mpeg', 'cobalt-audio'
+      ));
+    }
+
+    return {
+      backend: 'cobalt', instance: YTD.COBALT_API, id: ytId,
+      title: filename, channel: 'cobalt', duration: '-', durationSec: 0,
+      thumb: 'https://i.ytimg.com/vi/' + (ytId || '') + '/hqdefault.jpg',
+      qualities: YTD.sortQualities(quals), raw: data
+    };
+  },
+
+  /* one-shot cobalt fallback: open the cobalt web UI with the
+     link pre-filled — cobalt.tools auto-solves its own Turnstile
+     and auto-starts the download (guaranteed to work anywhere). */
+  openCobaltWeb(url, mode = 'auto') {
+    const target = YTD.COBALT_WEB + '/?u=' + encodeURIComponent(url);
+    const w = window.open(target, '_blank');
+    if (!w) { window.location.href = target; }
+    return true;
+  },
+
   /* race many promises: first fulfillment wins, collect errors */
   firstOf(promises) {
     return new Promise((resolve, reject) => {
@@ -455,8 +654,27 @@ const YTD = {
 
     const errors = [];
 
-    /* ── parallel probes: ALL piped + ALL invidious + jina proxy at once ── */
+    /* ── parallel probes: cobalt v11 + ALL piped + ALL invidious + jina at once ── */
     const probes = [];
+
+    /* cobalt v11 — the ONLY living backend in 2026.
+       Needs auth: custom Api-Key, or a Turnstile-session (captchaToken).
+       Without any auth → skip the probe (it would only 400) and let the
+       UI offer the cobalt.tools web fallback instead. */
+    const cobaltAuth = (opts.cobaltKey && String(opts.cobaltKey).trim())
+      ? { customKey: String(opts.cobaltKey).trim() }
+      : (YTD._captchaToken ? { captchaToken: YTD._captchaToken } : null);
+    if (cobaltAuth) {
+      probes.push(
+        YTD.probeCobaltV11(url, { ...cobaltAuth, knownTitle: 'yt download' })
+          .catch((e) => { throw new Error('cobalt: ' + e.message); })
+      );
+    } else {
+      // no auth available yet — record, do not probe
+      probes.push(new Promise((_, rej) => setTimeout(() =>
+        rej(new Error('cobalt: auth needed (no key, no captcha yet)')), 50)));
+    }
+
     for (const base of YTD.PIPED_INSTANCES) {
       probes.push(YTD.probePiped(ytId, base).catch((e) => { throw new Error('piped/' + base.replace(/^https?:\/\//, '') + ': ' + e.message); }));
     }
@@ -490,11 +708,18 @@ const YTD = {
       const best = await YTD.firstOf(probes);
       if (!best || !best.qualities || !best.qualities.length) throw new Error('empty result');
 
-      /* ── enrich: try to merge AUDIO-only from invidious too ── */
+      /* ── enrich: try to merge AUDIO-only from invidious + cobalt too ── */
       const audioProbes = [];
       for (const base of YTD.INVIDIOUS_INSTANCES) {
         audioProbes.push(
           YTD.probeInvidious(ytId, base).then((r) => (r.qualities || []).filter(q => q.kind === 'audio'))
+            .catch(() => [])
+        );
+      }
+      if (cobaltAuth) {
+        audioProbes.push(
+          YTD.probeCobaltV11(url, { ...cobaltAuth, mode: 'audio', knownTitle: 'audio' })
+            .then((r) => (r.qualities || []))
             .catch(() => [])
         );
       }
@@ -517,7 +742,12 @@ const YTD = {
       errors.push('backends: ' + e.message);
     }
 
-    throw new Error('all backends failed — ' + errors.join(' | '));
+    const allErr = new Error('all backends failed — ' + errors.join(' | '));
+    // flag: cobalt wants a streaming tunnel → offer the web UI fallback
+    if (errors.some((s) => s.includes('tunnel') || s.includes('auth needed'))) {
+      allErr.cobaltFallback = true;
+    }
+    throw allErr;
   },
 
   /* cobalt sequential (generic-url fallback) */
@@ -589,5 +819,42 @@ const YTD = {
 
   cancelTask(task) {
     if (task && task.ctrl) { task.ctrl.abort(); task.aborted = true; }
+  },
+
+  /* ═══════════════════════════════════════════════
+     AUTH / STATUS HELPERS (used by the UI)
+     ═══════════════════════════════════════════════ */
+
+  /* is a custom cobalt Api-Key configured? */
+  hasCobaltKey() {
+    try {
+      const k = (window.localStorage.getItem('ytd_cobalt_key') || '').trim();
+      return k.length > 0;
+    } catch (e) { return false; }
+  },
+
+  getCobaltKey() {
+    try { return (window.localStorage.getItem('ytd_cobalt_key') || '').trim(); }
+    catch (e) { return ''; }
+  },
+
+  setCobaltKey(k) {
+    try { window.localStorage.setItem('ytd_cobalt_key', (k || '').trim()); } catch (e) {}
+  },
+
+  /* can the app talk to the cobalt API right now? */
+  hasCobaltAuth() {
+    return YTD.hasCobaltKey() || !!YTD._captchaToken;
+  },
+
+  /* human-readable cobalt auth state */
+  cobaltAuthStatus() {
+    if (YTD.hasCobaltKey()) return 'ok (custom Api-Key)';
+    if (YTD._captchaToken) return 'ok (Turnstile session)';
+    if (YTD._turnstileErr && String(YTD._turnstileErr).startsWith('103')) {
+      return 'turnstile blocked on this domain — use cobalt.tools fallback or Api-Key';
+    }
+    if (YTD._turnstileReady) return 'waiting for Turnstile…';
+    return 'no auth — use cobalt.tools fallback or add Api-Key';
   }
 };
