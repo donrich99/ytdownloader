@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0a0f1a">
+<meta name="description" content="ytdownloader — Free YouTube video & audio downloader. C++3D terminal style. Built by dvc. Watch ads to support, downloads are 100% free.">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ytdownloader">
+<title>YTDOWNLOADER // C++3D TERMINAL // BY DVC</title>
+<link rel="icon" href="assets/favicon.ico" type="image/x-icon">
+<link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ═══════════ MATRIX RAIN BACKGROUND ═══════════ -->
+<canvas id="matrixRain" aria-hidden="true"></canvas>
+<div class="scanlines" aria-hidden="true"></div>
+<div class="grid-bg" aria-hidden="true"></div>
+
+<!-- ═══════════ BOOT / LOADING SCREEN ═══════════ -->
+<div id="bootScreen">
+  <div class="boot-box">
+    <pre class="boot-logo" id="bootLogo"></pre>
+    <div id="bootLog" class="boot-log"></div>
+    <div class="boot-bar"><div class="boot-bar-fill" id="bootBarFill"></div></div>
+  </div>
+</div>
+
+<!-- ═══════════ AD: TOP BANNER ═══════════ -->
+<div id="adTop" class="ad-slot ad-top" data-ad-slot="top">
+  <div class="ad-placeholder">// AD SLOT [TOP] — GOOGLE ADSENSE //</div>
+</div>
+
+<!-- ═══════════ MAIN SHELL ═══════════ -->
+<div id="mainApp" class="app hidden">
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+      <img src="assets/Ytdl.png" alt="ytdownloader" class="header-icon" id="headerIcon">
+      <div>
+        <h1 class="glitch" data-text="YTDOWNLOADER">YTDOWNLOADER</h1>
+        <p class="tagline">// <span class="cyan">C++3D</span> TERMINAL BUILD v1.0 // <span class="green">FREE</span> // <span class="yellow">by dvc</span> //</p>
+      </div>
+    </div>
+    <nav class="nav" id="navMenu">
+      <button class="nav-btn active" data-page="home">[ DOWNLOAD ]</button>
+      <button class="nav-btn" data-page="library">[ LIBRARY ]</button>
+      <button class="nav-btn" data-page="about">[ ABOUT ]</button>
+      <button class="nav-btn" data-page="settings">[ SETTINGS ]</button>
+    </nav>
+  </header>
+
+  <!-- ═══════════ PAGE: HOME / DOWNLOAD ═══════════ -->
+  <main id="page-home" class="page active">
+    <section class="hero-card tilt-card">
+      <div class="hero-text">
+        <pre class="ascii-banner" id="asciiBanner"></pre>
+        <div class="term-line"><span class="prompt">dvc@ytdownloader:~$</span> <span id="typedCmd" class="typed-cmd"></span><span class="cursor-blink">█</span></div>
+        <p class="hero-desc">PASTE YOUR YOUTUBE LINK → PICK QUALITY → <span class="green">DOWNLOAD</span>. NO LIMITS. NO PAYMENT. WATCH ADS TO SUPPORT THE BUILD.</p>
+      </div>
+    </section>
+
+    <!-- DOWNLOAD FORM -->
+    <section class="panel tilt-card" id="downloadPanel">
+      <div class="panel-title">┌── <span class="cyan">DOWNLOAD_CORE</span> ──┐</div>
+
+      <div class="input-row">
+        <label class="input-label" for="urlInput">$ url:</label>
+        <input type="url" id="urlInput" class="input url-input" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+        <button id="resolveBtn" class="btn btn-primary">[ FETCH ]</button>
+      </div>
+
+      <!-- INFO CARD (after fetch) -->
+      <div id="videoInfo" class="video-info hidden">
+        <div class="video-thumb-wrap"><img id="thumbImg" alt="thumb" class="video-thumb"></div>
+        <div class="video-meta">
+          <div id="videoTitle" class="video-title"></div>
+          <div id="videoChannel" class="video-channel"></div>
+          <div id="videoDuration" class="video-duration"></div>
+        </div>
+      </div>
+
+      <!-- QUALITY PICKER -->
+      <div id="qualityPanel" class="hidden">
+        <div class="panel-title" style="margin-top:16px">┌── <span class="cyan">QUALITY_PICKER</span> ──┐</div>
+        <div class="quality-grid" id="qualityGrid"></div>
+        <div class="term-note" id="qualityNote"></div>
+      </div>
+
+      <!-- PROGRESS -->
+      <div id="progressPanel" class="hidden">
+        <div class="term-line"><span class="prompt">dvc@ytdownloader:~$</span> <span id="progressLabel" class="progress-label">downloading...</span></div>
+        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-stats" id="progressStats"></div>
+      </div>
+
+      <!-- RESULT -->
+      <div id="resultPanel" class="hidden">
+        <div id="resultMsg" class="result-msg"></div>
+        <div class="result-actions">
+          <button id="downloadAgainBtn" class="btn">[ NEW_DOWNLOAD ]</button>
+        </div>
+      </div>
+
+      <div class="term-note" id="statusLine">// system: idle //</div>
+    </section>
+
+    <!-- MIDDLE IN-FEED AD -->
+    <div id="adInfeed" class="ad-slot ad-infeed" data-ad-slot="infeed">
+      <div class="ad-placeholder">// AD SLOT [IN-FEED] — GOOGLE ADSENSE //</div>
+    </div>
+
+    <!-- HOW TO -->
+    <section class="panel tilt-card">
+      <div class="panel-title">┌── <span class="cyan">HOW_TO_USE</span> ──┐</div>
+      <div class="howto">
+        <div class="howto-item"><span class="green">01</span> paste a YouTube link into the terminal</div>
+        <div class="howto-item"><span class="green">02</span> press [ FETCH ] — video info loads in ~1s</div>
+        <div class="howto-item"><span class="green">03</span> pick quality (video / audio-only)</div>
+        <div class="howto-item"><span class="green">04</span> hit download — file saves into your device downloads</div>
+        <div class="howto-item"><span class="yellow">browser</span> → saved in the browser download folder</div>
+        <div class="howto-item"><span class="yellow">android apk</span> → saved in the phone Download folder (file manager ready)</div>
+      </div>
+    </section>
+
+    <!-- APK BANNER -->
+    <section class="panel apk-panel tilt-card" id="downloadAppSection">
+      <div class="panel-title">┌── <span class="cyan">ANDROID_APK</span> ──┐</div>
+      <div class="apk-row">
+        <img src="assets/Ytdl.png" alt="apk" class="apk-icon">
+        <div class="apk-info">
+          <div class="apk-name">ytdownloader.apk <span class="badge">v1.0</span></div>
+          <div class="apk-desc">native android build — saves directly to your Download folder, works on ANY android version, same C++3D menu, ad-supported (free).</div>
+          <a href="assets/ytdownloader.apk" class="btn btn-download" download>⬇ [ DOWNLOAD_APK ]</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- ═══════════ PAGE: LIBRARY ═══════════ -->
+  <main id="page-library" class="page">
+    <section class="panel">
+      <div class="panel-title">┌── <span class="cyan">DOWNLOAD_LIBRARY</span> ──┐</div>
+      <div class="term-note">// all downloads recorded in local storage //</div>
+      <div id="libraryList" class="library-list"></div>
+      <button id="clearLibraryBtn" class="btn btn-danger hidden">[ CLEAR_LIBRARY ]</button>
+    </section>
+  </main>
+
+  <!-- ═══════════ PAGE: ABOUT ═══════════ -->
+  <main id="page-about" class="page">
+    <section class="panel about-panel">
+      <div class="panel-title">┌── <span class="cyan">ABOUT</span> ──┐</div>
+      <div class="about-content" id="aboutContent"></div>
+    </section>
+  </main>
+
+  <!-- ═══════════ PAGE: SETTINGS ═══════════ -->
+  <main id="page-settings" class="page">
+    <section class="panel">
+      <div class="panel-title">┌── <span class="cyan">SETTINGS</span> ──┐</div>
+
+      <div class="setting-row">
+        <label for="adsenseId">GOOGLE ADSENSE PUBLISHER ID (ca-pub-XXXX):</label>
+        <input type="text" id="adsenseId" class="input" placeholder="ca-pub-XXXXXXXXXXXXXXXX" autocomplete="off">
+        <div class="term-note">// owner: paste your approved AdSense publisher ID here to activate ads //</div>
+      </div>
+
+      <div class="setting-row">
+        <label for="cobaltKey">COBALT API KEY (optional — improves merge quality):</label>
+        <input type="text" id="cobaltKey" class="input" placeholder="leave empty for auto" autocomplete="off">
+      </div>
+
+      <div class="setting-row">
+        <button id="saveSettingsBtn" class="btn btn-primary">[ SAVE_SETTINGS ]</button>
+      </div>
+
+      <div class="setting-row">
+        <div class="term-note" id="settingsStatus"></div>
+      </div>
+    </section>
+  </main>
+
+</div>
+
+<!-- ═══════════ STICKY BOTTOM AD ═══════════ -->
+<div id="adBottom" class="ad-slot ad-bottom" data-ad-slot="bottom">
+  <div class="ad-placeholder">// AD SLOT [BOTTOM] — GOOGLE ADSENSE //</div>
+  <button id="adCloseBtn" class="ad-close" title="close">✕</button>
+</div>
+
+<!-- toast -->
+<div id="toast" class="toast hidden"></div>
+
+<script>
+  // PWA service worker registration
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+    });
+  }
+  // standalone install prompt detection
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    window._deferredInstall = e;
+  });
+</script>
+<script src="js/api.js"></script>
+<script src="js/db.js"></script>
+<script src="js/ads.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
