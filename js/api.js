@@ -1,20 +1,21 @@
 /* ═══════════════════════════════════════════════════════════
-   API.JS — backend engine for ytdownloader (v2.0 MAJOR REWRITE)
-   MULTI-BACKEND RESOLVER (sequential fallback):
-     1. Piped API     — 12+ public instances (standard + LBRY schema)
-     2. Invidious API — 10+ instances (adaptiveFormats: VIDEO + AUDIO)
-     3. Cobalt QB     — merge-quality fallback
-     4. Direct URL    — plain mp4/webm/audio links
-   Every backend returns BOTH video qualities AND audio-only
-   options, so the UI can show a full quality picker like the
-   classic ytdownloader tool (quality 1-9 incl. audio).
+   API.JS — backend engine for ytdownloader (v2.1 PARALLEL)
+   MULTI-BACKEND PARALLEL RESOLVER:
+     1. Piped API     — many instances, ALL tried at once
+     2. Invidious API — many instances, ALL tried at once (audio!)
+     3. Cobalt        — merge fallback
+     4. jina proxy    — r.jina.ai CORS proxy layer (browser-safe)
+     5. Direct URL    — plain mp4/webm/audio links
+   KEY FIX (v2.1): instances are probed IN PARALLEL so the
+   first working server wins within seconds (sequential probe
+   previously could take 100s+ and show only cryptic timeouts).
    ═══════════════════════════════════════════════════════════ */
 'use strict';
 
 const YTD = {
-  VERSION: '2.0.0',
+  VERSION: '2.1.0',
 
-  /* ── backend instance pools (fastest/most reliable first) ── */
+  /* ── backend instance pools ── */
   PIPED_INSTANCES: [
     'https://api.piped.private.coffee',
     'https://pipedapi.kavin.rocks',
@@ -23,11 +24,11 @@ const YTD = {
     'https://pipedapi.orangenet.cc',
     'https://pipedapi.adminforge.de',
     'https://pipedapi.reallyaweso.me',
-    'https://api.piped.private.coffee',
     'https://pipedapi.ducks.party',
     'https://pipedapi.r4fo.com',
     'https://pipedapi.drgns.space',
-    'https://api.piped.yt'
+    'https://api.piped.yt',
+    'https://pipedapi.vern.cc'
   ],
 
   INVIDIOUS_INSTANCES: [
@@ -40,7 +41,9 @@ const YTD = {
     'https://invidious.jing.rocks',
     'https://iv.datura.network',
     'https://inv.tux.pizza',
-    'https://yewtu.be'
+    'https://yewtu.be',
+    'https://invidious.materialio.us',
+    'https://invidious.lunar.icu'
   ],
 
   COBALT_INSTANCES: [
@@ -50,6 +53,9 @@ const YTD = {
     'https://cobalt-api.marcsello.org',
     'https://api.cobalt.best'
   ],
+
+  /* extra network path: r.jina.ai is a CORS-enabled read proxy */
+  JINA_PREFIX: 'https://r.jina.ai/',
 
   /* ── itag → human-readable map (YouTube) ── */
   ITAG_MAP: {
@@ -94,7 +100,7 @@ const YTD = {
   },
 
   /* fetch with timeout + JSON parse (single URL) */
-  async fetchJson(url, timeoutMs = 12000, opts = {}) {
+  async fetchJson(url, timeoutMs = 8000, opts = {}) {
     const ctrl = new AbortController();
     const t = setTimeout(() => ctrl.abort(), timeoutMs);
     try {
@@ -114,8 +120,21 @@ const YTD = {
     }
   },
 
-  /* try a URL through public CORS proxies (last-resort network layer) */
-  async fetchJsonViaProxies(url, timeoutMs = 20000) {
+  /* fetch JSON through the jina read-proxy (CORS-enabled network layer) */
+  async fetchJsonViaJina(url, timeoutMs = 10000) {
+    const proxied = await YTD.fetchJson(YTD.JINA_PREFIX + url, timeoutMs);
+    // jina wraps target content; the JSON payload is usually the last
+    // big chunk after "Markdown Content:" — find the first { or [ and parse.
+    if (proxied && typeof proxied === 'object') return proxied;
+    const txt = String(proxied);
+    const start = Math.max(txt.indexOf('{'), txt.indexOf('['));
+    if (start < 0) throw new Error('jina: no json');
+    try { return JSON.parse(txt.slice(start)); }
+    catch (e) { throw new Error('jina: bad json'); }
+  },
+
+  /* try a URL through public CORS proxies (last-resort layer) */
+  async fetchJsonViaProxies(url, timeoutMs = 10000) {
     const qt = encodeURIComponent(url);
     const proxies = [
       'https://api.allorigins.win/raw?url=' + qt,
@@ -126,7 +145,6 @@ const YTD = {
     for (const p of proxies) {
       try {
         const data = await YTD.fetchJson(p, timeoutMs);
-        // allorigins /get wraps in { contents: "<json string>" }
         if (data && typeof data === 'object' && typeof data.contents === 'string') {
           try { return JSON.parse(data.contents); } catch (e) { return data; }
         }
@@ -138,8 +156,6 @@ const YTD = {
 
   /* ═══════════════════════════════════════════════
      QUALITY OBJECT FACTORIES
-     Each: { label, sub, url, size, mime, key, kind }
-     kind: 'video' | 'audio' (UI groups them)
      ═══════════════════════════════════════════════ */
   qVideo(label, sub, url, size, mime, key) {
     return { label, sub, url, size: size > 0 ? size : null, mime: mime || 'video/mp4', key, kind: 'video', merge: false };
@@ -158,6 +174,21 @@ const YTD = {
     return [...quals].sort((a, b) => (a.kind === 'video' ? 0 : 1) - (b.kind === 'video' ? 0 : 1) || labelRank(a.label) - labelRank(b.label));
   },
 
+  /* ── merge: avoid duplicate urls across backends ── */
+  mergeQualities(...lists) {
+    const seen = new Set();
+    const out = [];
+    for (const list of lists) {
+      for (const q of list || []) {
+        if (!q || !q.url) continue;
+        if (seen.has(q.url)) continue;
+        seen.add(q.url);
+        out.push(q);
+      }
+    }
+    return out;
+  },
+
   /* ═══════════════════════════════════════════════
      PIPED — standard schema: streams[] + audioStreams[]
      ═══════════════════════════════════════════════ */
@@ -167,7 +198,6 @@ const YTD = {
     const streams = data.streams || [];
     const audio = (data.audioStreams || []).filter(a => a.url && !YTD.isHls(a.url));
 
-    /* muxed: single-file video+audio */
     const muxed = streams.filter(s => s.videoOnly === false && s.url && !YTD.isHls(s.url))
       .sort((a, b) => (b.height || 0) - (a.height || 0));
     for (const s of muxed) {
@@ -181,7 +211,6 @@ const YTD = {
       ));
     }
 
-    /* video-only high quality */
     const vOnly = streams.filter(s => s.videoOnly === true && s.url && !YTD.isHls(s.url))
       .sort((a, b) => (b.height || 0) - (a.height || 0));
     const seenH = new Set();
@@ -198,7 +227,6 @@ const YTD = {
       ));
     }
 
-    /* audio-only (m4a/webm/opus) */
     const aSorted = [...audio].sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
     for (const a of aSorted.slice(0, 4)) {
       if (seen.has(a.url)) continue;
@@ -235,7 +263,6 @@ const YTD = {
       ));
     }
 
-    /* LBRY audioStreams (very common in Odysee-backed instances) */
     const audio = (data.audioStreams || []).filter(a => a.url && !YTD.isHls(a.url));
     const aSorted = [...audio].sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
     for (const a of aSorted.slice(0, 4)) {
@@ -294,151 +321,107 @@ const YTD = {
   },
 
   /* ═══════════════════════════════════════════════
-     RESOLVE PER BACKEND (all instances tried)
+     PARALLEL RESOLVE — try every instance at once,
+     first working backend wins (max ~8s total).
+     Each probe is a tiny promise; Promise.any-style.
      ═══════════════════════════════════════════════ */
-  async resolvePiped(id) {
-    let lastErr = null;
-    for (const base of YTD.PIPED_INSTANCES) {
-      try {
-        const data = await YTD.fetchJson(base + '/streams/' + id);
-        if (!data) throw new Error('empty');
-        let quals = null;
-        if (Array.isArray(data.streams) && data.streams.length) quals = YTD.parseStandardPiped(data);
-        else if (Array.isArray(data.videoStreams) && data.videoStreams.length) quals = YTD.parseLbryPiped(data);
-        if (!quals || !quals.length) throw new Error('no usable streams');
-        return {
-          backend: 'piped', instance: base, id,
-          title: data.title || 'Untitled',
-          channel: data.uploader || data.uploaderName || data.author || 'Unknown',
-          duration: YTD.fmtDur(data.duration), durationSec: data.duration || 0,
-          thumb: data.thumbnailUrl || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
-          qualities: YTD.sortQualities(quals), raw: data
-        };
-      } catch (e) { lastErr = e; }
-    }
-    // last resort: piped through CORS proxies
-    try {
-      const proxied = await YTD.fetchJsonViaProxies('https://api.piped.private.coffee/streams/' + id);
+  probePiped(id, base) {
+    return YTD.fetchJson(base + '/streams/' + id).then((data) => {
+      if (!data) throw new Error('empty');
       let quals = null;
-      if (Array.isArray(proxied.streams) && proxied.streams.length) quals = YTD.parseStandardPiped(proxied);
-      else if (Array.isArray(proxied.videoStreams) && proxied.videoStreams.length) quals = YTD.parseLbryPiped(proxied);
-      if (quals && quals.length) {
-        return {
-          backend: 'piped-proxy', instance: 'cors-proxy', id,
-          title: proxied.title || 'Untitled',
-          channel: proxied.uploader || proxied.uploaderName || 'Unknown',
-          duration: YTD.fmtDur(proxied.duration), durationSec: proxied.duration || 0,
-          thumb: proxied.thumbnailUrl || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
-          qualities: YTD.sortQualities(quals), raw: proxied
-        };
-      }
-    } catch (e) { lastErr = e; }
-    throw lastErr || new Error('all piped instances failed');
+      if (Array.isArray(data.streams) && data.streams.length) quals = YTD.parseStandardPiped(data);
+      else if (Array.isArray(data.videoStreams) && data.videoStreams.length) quals = YTD.parseLbryPiped(data);
+      if (!quals || !quals.length) throw new Error('no usable streams');
+      return {
+        backend: 'piped', instance: base, id,
+        title: data.title || 'Untitled',
+        channel: data.uploader || data.uploaderName || data.author || 'Unknown',
+        duration: YTD.fmtDur(data.duration), durationSec: data.duration || 0,
+        thumb: data.thumbnailUrl || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
+        qualities: YTD.sortQualities(quals), raw: data
+      };
+    });
   },
 
-  async resolveInvidious(id) {
-    let lastErr = null;
-    for (const base of YTD.INVIDIOUS_INSTANCES) {
-      try {
-        const data = await YTD.fetchJson(base + '/api/v1/videos/' + id, 12000);
-        if (!data || !data.title) throw new Error('no data');
-        const quals = YTD.parseInvidious(data);
-        if (!quals.length) throw new Error('no formats');
-        return {
-          backend: 'invidious', instance: base, id,
-          title: data.title, channel: data.author || 'Unknown',
-          duration: YTD.fmtDur(data.lengthSeconds), durationSec: data.lengthSeconds || 0,
-          thumb: data.videoThumbnails && data.videoThumbnails.length ? data.videoThumbnails[data.videoThumbnails.length - 1].url : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
-          qualities: YTD.sortQualities(quals), raw: data
-        };
-      } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('all invidious instances failed');
+  probeInvidious(id, base) {
+    return YTD.fetchJson(base + '/api/v1/videos/' + id).then((data) => {
+      if (!data || !data.title) throw new Error('no data');
+      const quals = YTD.parseInvidious(data);
+      if (!quals.length) throw new Error('no formats');
+      return {
+        backend: 'invidious', instance: base, id,
+        title: data.title, channel: data.author || 'Unknown',
+        duration: YTD.fmtDur(data.lengthSeconds), durationSec: data.lengthSeconds || 0,
+        thumb: data.videoThumbnails && data.videoThumbnails.length ? data.videoThumbnails[data.videoThumbnails.length - 1].url : 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
+        qualities: YTD.sortQualities(quals), raw: data
+      };
+    });
   },
 
-  async resolveCobalt(url, opts = {}) {
+  probeCobalt(url, base, opts = {}) {
+    const clean = base.replace(/\/$/, '');
     const payload = { url, downloadMode: 'auto', videoQuality: '1080' };
-    let lastErr = null;
-    const list = opts.cobaltInstance ? [opts.cobaltInstance] : YTD.COBALT_INSTANCES;
-    for (const base of list) {
-      try {
-        const clean = base.replace(/\/$/, '');
-        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (opts.cobaltKey) headers['Authorization'] = 'Bearer ' + opts.cobaltKey;
-        const data = await YTD.fetchJson(clean + '/', 15000, {
-          method: 'POST', body: JSON.stringify(payload), headers
-        });
-        if (data.status === 'error') throw new Error(data.error && data.error.code || 'cobalt error');
-        if (!data.url) throw new Error('no url');
-        return {
-          backend: 'cobalt', instance: clean, id: YTD.extractYtId(url),
-          title: (opts.knownTitle || data.filename || 'yt download').replace(/\.[^.]+$/, ''),
-          channel: 'cobalt merge',
-          duration: '-', durationSec: 0,
-          thumb: 'https://i.ytimg.com/vi/' + (YTD.extractYtId(url) || '') + '/hqdefault.jpg',
-          qualities: [
-            YTD.qVideo('Best (merged)', '1080p max · via ' + clean, data.url, data.size || null, 'video/mp4', 'cobalt-best')
-          ],
-          raw: data
-        };
-      } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('all cobalt instances failed');
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (opts.cobaltKey) headers['Authorization'] = 'Bearer ' + opts.cobaltKey;
+    return YTD.fetchJson(clean + '/', 9000, {
+      method: 'POST', body: JSON.stringify(payload), headers
+    }).then((data) => {
+      if (data.status === 'error') throw new Error((data.error && data.error.code) || 'cobalt error');
+      if (!data.url) throw new Error('no url');
+      return {
+        backend: 'cobalt', instance: clean, id: YTD.extractYtId(url),
+        title: (opts.knownTitle || data.filename || 'yt download').replace(/\.[^.]+$/, ''),
+        channel: 'cobalt merge',
+        duration: '-', durationSec: 0,
+        thumb: 'https://i.ytimg.com/vi/' + (YTD.extractYtId(url) || '') + '/hqdefault.jpg',
+        qualities: [
+          YTD.qVideo('Best (merged)', '1080p max · via ' + clean, data.url, data.size || null, 'video/mp4', 'cobalt-best')
+        ],
+        raw: data
+      };
+    });
   },
 
-  /* ═══════════════════════════════════════════════
-     RESOLVE AUDIO-ONLY (fast path for "Audio only")
-     Tries: invidious audio formats → cobalt audio mode
-     ═══════════════════════════════════════════════ */
-  async resolveAudio(url, opts = {}) {
-    const ytId = YTD.extractYtId(url);
-    if (ytId) {
-      // invidious adaptiveFormats → audio streams
-      try {
-        const r = await YTD.resolveInvidious(ytId);
-        const audioQ = (r.qualities || []).filter(q => q.kind === 'audio');
-        if (audioQ.length) {
-          return {
-            backend: r.backend, instance: r.instance, id: ytId,
-            title: r.title, channel: r.channel, duration: r.duration, durationSec: r.durationSec,
-            thumb: r.thumb, qualities: audioQ, raw: r.raw
-          };
-        }
-      } catch (e) {}
-    }
-
-    // cobalt audio mode
+  probeCobaltAudio(url, base, opts = {}) {
+    const clean = base.replace(/\/$/, '');
     const payload = { url, downloadMode: 'audio', audioFormat: 'mp3', audioBitrate: '128' };
-    let lastErr = null;
-    const list = YTD.COBALT_INSTANCES;
-    for (const base of list) {
-      try {
-        const clean = base.replace(/\/$/, '');
-        const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (opts.cobaltKey) headers['Authorization'] = 'Bearer ' + opts.cobaltKey;
-        const data = await YTD.fetchJson(clean + '/', 15000, {
-          method: 'POST', body: JSON.stringify(payload), headers
-        });
-        if (data.status === 'error') throw new Error((data.error && data.error.code) || 'cobalt error');
-        if (!data.url) throw new Error('no url');
-        return {
-          backend: 'cobalt', instance: clean, id: ytId,
-          title: (opts.knownTitle || data.filename || 'yt audio').replace(/\.[^.]+$/, ''),
-          channel: 'cobalt audio', duration: '-', durationSec: 0,
-          thumb: ytId ? 'https://i.ytimg.com/vi/' + ytId + '/hqdefault.jpg' : null,
-          qualities: [YTD.qAudio('Audio only (mp3)', '128 kbps via ' + clean, data.url, data.size || null, 'audio/mpeg', 'cobalt-audio')],
-          raw: data
-        };
-      } catch (e) { lastErr = e; }
-    }
-    throw lastErr || new Error('no audio stream available — all backends failed');
+    const headers = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+    if (opts.cobaltKey) headers['Authorization'] = 'Bearer ' + opts.cobaltKey;
+    return YTD.fetchJson(clean + '/', 9000, {
+      method: 'POST', body: JSON.stringify(payload), headers
+    }).then((data) => {
+      if (data.status === 'error') throw new Error((data.error && data.error.code) || 'cobalt error');
+      if (!data.url) throw new Error('no url');
+      return {
+        backend: 'cobalt', instance: clean,
+        url: data.url, size: data.size || null, raw: data
+      };
+    });
+  },
+
+  /* race many promises: first fulfillment wins, collect errors */
+  firstOf(promises) {
+    return new Promise((resolve, reject) => {
+      let pending = promises.length;
+      const errors = [];
+      if (!pending) { reject(new Error('no probes')); return; }
+      promises.forEach((p, i) => {
+        Promise.resolve(p).then(
+          (v) => resolve(v),
+          (e) => {
+            errors[i] = (e && e.message) || String(e);
+            if (--pending === 0) reject(new Error(errors.filter(Boolean).join(' | ')));
+          }
+        );
+      });
+    });
   },
 
   /* ═══════════════════════════════════════════════
-     RESOLVE MASTER — tries every backend in order
+     RESOLVE MASTER — parallel piped + invidious + cobalt
      ═══════════════════════════════════════════════ */
   async resolve(url, opts = {}) {
-    // 1. direct media file
+    // direct media file
     if (YTD.isDirectUrl(url)) {
       const m = url.split('/').pop().split('?')[0];
       const isAudioFile = /\.(mp3|m4a|ogg|wav|flac|opus)(\?|#|$)/i.test(url);
@@ -452,33 +435,99 @@ const YTD = {
       };
     }
 
-    // 2. YouTube URL → piped → invidious → cobalt
     const ytId = YTD.extractYtId(url);
-    if (ytId) {
+    if (!ytId) {
+      // generic URL → cobalt + proxies
       const errors = [];
-      try { return await YTD.resolvePiped(ytId); }
-      catch (e) { errors.push('piped: ' + e.message); }
-      try { return await YTD.resolveInvidious(ytId); }
-      catch (e) { errors.push('invidious: ' + e.message); }
-      try { return await YTD.resolveCobalt(url, opts); }
+      try { return await YTD.resolveCobaltSeq(url, opts); }
       catch (e) { errors.push('cobalt: ' + e.message); }
-      throw new Error('all backends failed — ' + errors.join(' | '));
+      try {
+        const proxied = await YTD.fetchJsonViaProxies(url);
+        return {
+          backend: 'proxy', id: null, title: url.split('/').pop() || 'download',
+          channel: 'proxy', duration: '-', durationSec: 0, thumb: null,
+          qualities: [YTD.qVideo('Direct file (proxy)', 'via cors proxy', url, null, 'application/octet-stream', 'proxy')],
+          raw: null
+        };
+      } catch (e) { errors.push('proxy: ' + e.message); }
+      throw new Error('no backend could resolve this url — ' + errors.join(' | '));
     }
 
-    // 3. generic URL → cobalt only
     const errors = [];
-    try { return await YTD.resolveCobalt(url, opts); }
-    catch (e) { errors.push('cobalt: ' + e.message); }
+
+    /* ── parallel probes: ALL piped + ALL invidious + jina proxy at once ── */
+    const probes = [];
+    for (const base of YTD.PIPED_INSTANCES) {
+      probes.push(YTD.probePiped(ytId, base).catch((e) => { throw new Error('piped/' + base.replace(/^https?:\/\//, '') + ': ' + e.message); }));
+    }
+    for (const base of YTD.INVIDIOUS_INSTANCES) {
+      probes.push(YTD.probeInvidious(ytId, base).catch((e) => { throw new Error('inv/' + base.replace(/^https?:\/\//, '') + ': ' + e.message); }));
+    }
+    // jina proxy layer for the most reliable direct instance (browser-CORS safe)
+    probes.push(
+      YTD.fetchJsonViaJina('https://api.piped.private.coffee/streams/' + ytId).then((data) => {
+        let quals = null;
+        if (Array.isArray(data.videoStreams) && data.videoStreams.length) quals = YTD.parseLbryPiped(data);
+        else if (Array.isArray(data.streams) && data.streams.length) quals = YTD.parseStandardPiped(data);
+        if (!quals || !quals.length) throw new Error('no streams');
+        return {
+          backend: 'piped-jina', instance: 'jina-proxy', id: ytId,
+          title: data.title || 'Untitled',
+          channel: data.uploader || data.uploaderName || data.author || 'Unknown',
+          duration: YTD.fmtDur(data.duration), durationSec: data.duration || 0,
+          thumb: data.thumbnailUrl || 'https://i.ytimg.com/vi/' + ytId + '/hqdefault.jpg',
+          qualities: YTD.sortQualities(quals), raw: data
+        };
+      }).catch((e) => { throw new Error('jina/proxy: ' + e.message); })
+    );
+    // cobalt merge (best-effort; usually requires api key in 2026)
+    for (const base of YTD.COBALT_INSTANCES) {
+      probes.push(YTD.probeCobalt(url, base, opts).catch((e) => { throw new Error('cobalt/' + base.replace(/^https?:\/\//, '') + ': ' + e.message); }));
+    }
+
+    /* first winner with real qualities */
     try {
-      const proxied = await YTD.fetchJsonViaProxies(url);
-      return {
-        backend: 'proxy', id: null, title: url.split('/').pop() || 'download',
-        channel: 'proxy', duration: '-', durationSec: 0, thumb: null,
-        qualities: [YTD.qVideo('Direct file (proxy)', 'via cors proxy', url, null, 'application/octet-stream', 'proxy')],
-        raw: null
-      };
-    } catch (e) { errors.push('proxy: ' + e.message); }
-    throw new Error('no backend could resolve this url — ' + errors.join(' | '));
+      const best = await YTD.firstOf(probes);
+      if (!best || !best.qualities || !best.qualities.length) throw new Error('empty result');
+
+      /* ── enrich: try to merge AUDIO-only from invidious too ── */
+      const audioProbes = [];
+      for (const base of YTD.INVIDIOUS_INSTANCES) {
+        audioProbes.push(
+          YTD.probeInvidious(ytId, base).then((r) => (r.qualities || []).filter(q => q.kind === 'audio'))
+            .catch(() => [])
+        );
+      }
+      for (const base of YTD.COBALT_INSTANCES) {
+        audioProbes.push(
+          YTD.probeCobaltAudio(url, base, opts).then((a) => [
+            YTD.qAudio('Audio only (mp3)', '128 kbps · ' + a.instance, a.url, a.size, 'audio/mpeg', 'cobalt-audio')
+          ]).catch(() => [])
+        );
+      }
+      const audioLists = await Promise.all(audioProbes);
+      const audios = audioLists.flat().filter(Boolean);
+      if (audios.length) {
+        const merged = YTD.mergeQualities(best.qualities, audios);
+        best.qualities = YTD.sortQualities(merged);
+        best.audioAlso = true;
+      }
+      return best;
+    } catch (e) {
+      errors.push('backends: ' + e.message);
+    }
+
+    throw new Error('all backends failed — ' + errors.join(' | '));
+  },
+
+  /* cobalt sequential (generic-url fallback) */
+  async resolveCobaltSeq(url, opts = {}) {
+    let lastErr = null;
+    for (const base of YTD.COBALT_INSTANCES) {
+      try { return await YTD.probeCobalt(url, base, opts); }
+      catch (e) { lastErr = e; }
+    }
+    throw lastErr || new Error('all cobalt instances failed');
   },
 
   /* ═══════════════════════════════════════════════

@@ -38,6 +38,11 @@ body {
 
 .hidden { display: none !important; }
 
+/* ═══════════ PAGE SWITCHING (menu tabs) ═══════════ */
+.page { display: none; }
+.page.active { display: block; }
+
+
 /* ═══════════ WELCOME / BOOT SCREEN ═══════════ */
 #bootScreen {
   position: fixed;
