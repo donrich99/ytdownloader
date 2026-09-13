@@ -1,15 +1,15 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0a0f1a">
-<meta name="description" content="ytdownloader — Free YouTube video & audio downloader. C++3D terminal style. Built by dvc. 100% free forever — supported by donations.">
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="ytdownloader — Free YouTube video & audio downloader. Built by dvc. 100% free forever — supported by donations.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="ytdownloader">
-<title>YTDOWNLOADER // C++3D TERMINAL // BY DVC</title>
+<title>ytdownloader — YouTube Link Downloader</title>
 <link rel="icon" href="assets/favicon.ico" type="image/x-icon">
 <link rel="shortcut icon" href="assets/favicon.ico" type="image/x-icon">
 <link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png">
@@ -18,16 +18,12 @@
 </head>
 <body>
 
-<!-- ═══════════ MATRIX RAIN BACKGROUND ═══════════ -->
-<canvas id="matrixRain" aria-hidden="true"></canvas>
-<div class="scanlines" aria-hidden="true"></div>
-<div class="grid-bg" aria-hidden="true"></div>
-
-<!-- ═══════════ BOOT / LOADING SCREEN ═══════════ -->
+<!-- ═══════════ WELCOME / LOADING SCREEN ═══════════ -->
 <div id="bootScreen">
   <div class="boot-box">
-    <pre class="boot-logo" id="bootLogo"></pre>
-    <div id="bootLog" class="boot-log"></div>
+    <img src="assets/Ytdl.png" alt="ytdownloader" class="boot-icon">
+    <div class="boot-title">WELCOME TO <span class="red">YOUTUBE LINK</span> DOWNLOADER</div>
+    <div class="boot-sub">// free forever · by dvc · supported by donations //</div>
     <div class="boot-bar"><div class="boot-bar-fill" id="bootBarFill"></div></div>
   </div>
 </div>
@@ -39,38 +35,33 @@
   <header class="header">
     <div class="header-left">
       <img src="assets/Ytdl.png" alt="ytdownloader" class="header-icon" id="headerIcon">
-      <div>
-        <h1 class="glitch" data-text="YTDOWNLOADER">YTDOWNLOADER</h1>
-        <p class="tagline">// <span class="cyan">C++3D</span> TERMINAL BUILD v1.0 // <span class="green">FREE</span> // <span class="yellow">by dvc</span> //</p>
+      <div class="brand">
+        <h1 class="brand-name">ytdownloader</h1>
+        <p class="brand-tag">YouTube Link Downloader</p>
       </div>
     </div>
     <nav class="nav" id="navMenu">
-      <button class="nav-btn active" data-page="home">[ DOWNLOAD ]</button>
-      <button class="nav-btn" data-page="library">[ LIBRARY ]</button>
-      <button class="nav-btn" data-page="about">[ ABOUT ]</button>
-      <button class="nav-btn" data-page="settings">[ SETTINGS ]</button>
+      <button class="nav-btn active" data-page="home">Download</button>
+      <button class="nav-btn" data-page="library">Library</button>
+      <button class="nav-btn" data-page="about">About</button>
     </nav>
   </header>
 
-  <!-- ═══════════ PAGE: HOME / DOWNLOAD ═══════════ -->
+  <!-- ═══════════ PAGE: HOME — DOWNLOAD CORE SA TAAS ═══════════ -->
   <main id="page-home" class="page active">
-    <section class="hero-card tilt-card">
-      <div class="hero-text">
-        <pre class="ascii-banner" id="asciiBanner"></pre>
-        <div class="term-line"><span class="prompt">dvc@ytdownloader:~$</span> <span id="typedCmd" class="typed-cmd"></span><span class="cursor-blink">█</span></div>
-        <p class="hero-desc">PASTE YOUR YOUTUBE LINK → PICK QUALITY → <span class="green">DOWNLOAD</span>. NO LIMITS. NO PAYMENT. 100% FREE — SUPPORTED BY DONATIONS.</p>
-      </div>
-    </section>
 
-    <!-- DOWNLOAD FORM -->
-    <section class="panel tilt-card" id="downloadPanel">
-      <div class="panel-title">┌── <span class="cyan">DOWNLOAD_CORE</span> ──┐</div>
+    <!-- DOWNLOAD CORE — pinaka-itaas para agad makita -->
+    <section class="panel core-panel" id="downloadPanel">
+      <div class="core-head">
+        <h2 class="core-title">Download videos &amp; audio</h2>
+        <p class="core-sub">Paste a YouTube link below, pick a quality, and download. No sign-up needed.</p>
+      </div>
 
       <div class="input-row">
-        <label class="input-label" for="urlInput">$ url:</label>
-        <input type="url" id="urlInput" class="input url-input" placeholder="https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
-        <button id="resolveBtn" class="btn btn-primary">[ FETCH ]</button>
+        <input type="url" id="urlInput" class="input url-input" placeholder="Paste YouTube link here — https://www.youtube.com/watch?v=..." autocomplete="off" spellcheck="false">
+        <button id="resolveBtn" class="btn btn-primary">Download</button>
       </div>
+      <div class="term-note" id="statusLine">// system: idle //</div>
 
       <!-- INFO CARD (after fetch) -->
       <div id="videoInfo" class="video-info hidden">
@@ -82,53 +73,49 @@
         </div>
       </div>
 
-      <!-- QUALITY PICKER -->
+      <!-- QUALITY PICKER — video + audio groups -->
       <div id="qualityPanel" class="hidden">
-        <div class="panel-title" style="margin-top:16px">┌── <span class="cyan">QUALITY_PICKER</span> ──┐</div>
+        <div class="quality-label">CHOOSE QUALITY</div>
         <div class="quality-grid" id="qualityGrid"></div>
         <div class="term-note" id="qualityNote"></div>
       </div>
 
       <!-- PROGRESS -->
       <div id="progressPanel" class="hidden">
-        <div class="term-line"><span class="prompt">dvc@ytdownloader:~$</span> <span id="progressLabel" class="progress-label">downloading...</span></div>
         <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
         <div class="progress-stats" id="progressStats"></div>
+        <div class="progress-label" id="progressLabel">downloading...</div>
       </div>
 
       <!-- RESULT -->
       <div id="resultPanel" class="hidden">
         <div id="resultMsg" class="result-msg"></div>
         <div class="result-actions">
-          <button id="downloadAgainBtn" class="btn">[ NEW_DOWNLOAD ]</button>
+          <button id="downloadAgainBtn" class="btn">New download</button>
         </div>
       </div>
-
-      <div class="term-note" id="statusLine">// system: idle //</div>
     </section>
 
     <!-- HOW TO -->
-    <section class="panel tilt-card">
-      <div class="panel-title">┌── <span class="cyan">HOW_TO_USE</span> ──┐</div>
+    <section class="panel">
+      <h2 class="section-title">How to use</h2>
       <div class="howto">
-        <div class="howto-item"><span class="green">01</span> paste a YouTube link into the terminal</div>
-        <div class="howto-item"><span class="green">02</span> press [ FETCH ] — video info loads in ~1s</div>
-        <div class="howto-item"><span class="green">03</span> pick quality (video / audio-only)</div>
-        <div class="howto-item"><span class="green">04</span> hit download — file saves into your device downloads</div>
-        <div class="howto-item"><span class="yellow">browser</span> → saved in the browser download folder</div>
-        <div class="howto-item"><span class="yellow">android apk</span> → saved in the phone Download folder (file manager ready)</div>
+        <div class="howto-item"><span class="step">1</span> Paste a YouTube link in the box above</div>
+        <div class="howto-item"><span class="step">2</span> Press the Download button — info loads fast</div>
+        <div class="howto-item"><span class="step">3</span> Pick video quality or audio-only</div>
+        <div class="howto-item"><span class="step">4</span> Hit download — file saves to your device</div>
+        <div class="howto-item note">Browser → your downloads folder &nbsp;|&nbsp; Android app → phone Download folder</div>
       </div>
     </section>
 
     <!-- APK BANNER -->
-    <section class="panel apk-panel tilt-card" id="downloadAppSection">
-      <div class="panel-title">┌── <span class="cyan">ANDROID_APK</span> ──┐</div>
+    <section class="panel apk-panel" id="downloadAppSection">
       <div class="apk-row">
         <img src="assets/Ytdl.png" alt="apk" class="apk-icon">
         <div class="apk-info">
-          <div class="apk-name">ytdownloader.apk <span class="badge">v1.0</span></div>
-          <div class="apk-desc">native android build — saves directly to your Download folder, works on ANY android version, same C++3D menu, 100% free.</div>
-          <a href="assets/ytdownloader.apk" class="btn btn-download" download>⬇ [ DOWNLOAD_APK ]</a>
+          <div class="apk-name">ytdownloader Android App <span class="badge">v1.0</span></div>
+          <div class="apk-desc">Native Android app — saves straight to your Download folder, works on any Android, same clean menu.</div>
+          <a href="assets/ytdownloader.apk" class="btn btn-download" download>Download APK</a>
         </div>
       </div>
     </section>
@@ -137,38 +124,18 @@
   <!-- ═══════════ PAGE: LIBRARY ═══════════ -->
   <main id="page-library" class="page">
     <section class="panel">
-      <div class="panel-title">┌── <span class="cyan">DOWNLOAD_LIBRARY</span> ──┐</div>
-      <div class="term-note">// all downloads recorded in local storage //</div>
+      <h2 class="section-title">Download library</h2>
+      <div class="term-note">// downloads recorded on this device //</div>
       <div id="libraryList" class="library-list"></div>
-      <button id="clearLibraryBtn" class="btn btn-danger hidden">[ CLEAR_LIBRARY ]</button>
+      <button id="clearLibraryBtn" class="btn btn-danger hidden">Clear library</button>
     </section>
   </main>
 
   <!-- ═══════════ PAGE: ABOUT ═══════════ -->
   <main id="page-about" class="page">
     <section class="panel about-panel">
-      <div class="panel-title">┌── <span class="cyan">ABOUT</span> ──┐</div>
+      <h2 class="section-title">About</h2>
       <div class="about-content" id="aboutContent"></div>
-    </section>
-  </main>
-
-  <!-- ═══════════ PAGE: SETTINGS ═══════════ -->
-  <main id="page-settings" class="page">
-    <section class="panel">
-      <div class="panel-title">┌── <span class="cyan">SETTINGS</span> ──┐</div>
-
-      <div class="setting-row">
-        <label for="cobaltKey">COBALT API KEY (optional — improves merge quality):</label>
-        <input type="text" id="cobaltKey" class="input" placeholder="leave empty for auto" autocomplete="off">
-      </div>
-
-      <div class="setting-row">
-        <button id="saveSettingsBtn" class="btn btn-primary">[ SAVE_SETTINGS ]</button>
-      </div>
-
-      <div class="setting-row">
-        <div class="term-note" id="settingsStatus"></div>
-      </div>
     </section>
   </main>
 
@@ -177,6 +144,10 @@
 <!-- toast -->
 <div id="toast" class="toast hidden"></div>
 
+<footer class="footer">
+  <span>ytdownloader v1.1 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+</footer>
+
 <script>
   // PWA service worker registration
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -184,7 +155,6 @@
       navigator.serviceWorker.register('service-worker.js').catch(() => {});
     });
   }
-  // standalone install prompt detection
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     window._deferredInstall = e;
