@@ -1,4 +1,0 @@
-# ad.txt — Google AdSense verification for ytdownloader (donrich99.github.io)
-# Owner: dvc (poorvallejos@gmail.com)
-# Fill in your publisher id after AdSense approval, e.g.:
-# google.com, pub-XXXXXXXXXXXXXXXX, DIRECT, f08c47fec0942fa0

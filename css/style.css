@@ -616,58 +616,57 @@ body {
   letter-spacing: 0.5px;
 }
 
-/* ═══ AD SLOTS ═══ */
-.ad-slot {
-  position: relative;
-  text-align: center;
-  overflow: hidden;
-  border-radius: 10px;
-  margin-bottom: 18px;
-}
-.ad-top {
-  max-width: 900px;
-  margin: 10px auto;
-  min-height: 90px;
-  z-index: 5;
-  position: relative;
-}
-.ad-infeed { min-height: 90px; }
-.ad-bottom {
-  position: fixed;
-  bottom: 0; left: 50%;
-  transform: translateX(-50%);
-  width: min(900px, 100%);
-  min-height: 60px;
-  z-index: 900;
-  background: var(--bg2);
-  border-top: 1px solid var(--panel-border);
-  border-radius: 12px 12px 0 0;
-  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.6);
-  padding: 6px;
-  margin: 0;
-}
-.ad-placeholder {
-  font-size: 11px;
-  color: var(--dim);
+/* ═══ DONATION BOX (GCash) ═══ */
+.donate-box {
   display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: inherit;
-  border: 1px dashed rgba(90, 112, 144, 0.4);
-  border-radius: 8px;
-  letter-spacing: 1px;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(0, 190, 116, 0.12), rgba(0, 120, 70, 0.05));
+  border: 1px solid rgba(0, 220, 130, 0.4);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin: 10px 0 16px;
+  box-shadow: 0 0 24px rgba(0, 190, 116, 0.08);
 }
-.ad-close {
-  position: absolute;
-  top: 2px; right: 6px;
-  background: transparent;
-  border: none;
+.donate-icon {
+  font-size: 42px;
+  line-height: 1;
+  filter: drop-shadow(0 0 10px rgba(0, 220, 130, 0.5));
+}
+.donate-text { flex: 1; text-align: left; }
+.donate-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+.donate-num {
+  font-family: var(--mono);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: #fff;
+  text-shadow: 0 0 14px rgba(0, 220, 130, 0.45);
+  margin-bottom: 4px;
+}
+.donate-note {
+  font-size: 12px;
   color: var(--dim);
-  font-size: 14px;
-  cursor: pointer;
-  z-index: 2;
+  margin-bottom: 10px;
 }
-.ad-close:hover { color: var(--red); }
+.btn-donate {
+  background: linear-gradient(135deg, #00be74, #007846);
+  border: 1px solid rgba(0, 220, 130, 0.6);
+  color: #04120a;
+  font-weight: 700;
+  box-shadow: 0 0 18px rgba(0, 190, 116, 0.3);
+}
+.btn-donate:hover {
+  background: linear-gradient(135deg, #00d985, #00965c);
+  transform: translateY(-1px);
+  box-shadow: 0 0 26px rgba(0, 220, 130, 0.5);
+}
 
 /* ═══ TOAST ═══ */
 .toast {

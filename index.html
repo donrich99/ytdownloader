@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0a0f1a">
-<meta name="description" content="ytdownloader — Free YouTube video & audio downloader. C++3D terminal style. Built by dvc. Watch ads to support, downloads are 100% free.">
+<meta name="description" content="ytdownloader — Free YouTube video & audio downloader. C++3D terminal style. Built by dvc. 100% free forever — supported by donations.">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -30,11 +30,6 @@
     <div id="bootLog" class="boot-log"></div>
     <div class="boot-bar"><div class="boot-bar-fill" id="bootBarFill"></div></div>
   </div>
-</div>
-
-<!-- ═══════════ AD: TOP BANNER ═══════════ -->
-<div id="adTop" class="ad-slot ad-top" data-ad-slot="top">
-  <div class="ad-placeholder">// AD SLOT [TOP] — GOOGLE ADSENSE //</div>
 </div>
 
 <!-- ═══════════ MAIN SHELL ═══════════ -->
@@ -63,7 +58,7 @@
       <div class="hero-text">
         <pre class="ascii-banner" id="asciiBanner"></pre>
         <div class="term-line"><span class="prompt">dvc@ytdownloader:~$</span> <span id="typedCmd" class="typed-cmd"></span><span class="cursor-blink">█</span></div>
-        <p class="hero-desc">PASTE YOUR YOUTUBE LINK → PICK QUALITY → <span class="green">DOWNLOAD</span>. NO LIMITS. NO PAYMENT. WATCH ADS TO SUPPORT THE BUILD.</p>
+        <p class="hero-desc">PASTE YOUR YOUTUBE LINK → PICK QUALITY → <span class="green">DOWNLOAD</span>. NO LIMITS. NO PAYMENT. 100% FREE — SUPPORTED BY DONATIONS.</p>
       </div>
     </section>
 
@@ -112,11 +107,6 @@
       <div class="term-note" id="statusLine">// system: idle //</div>
     </section>
 
-    <!-- MIDDLE IN-FEED AD -->
-    <div id="adInfeed" class="ad-slot ad-infeed" data-ad-slot="infeed">
-      <div class="ad-placeholder">// AD SLOT [IN-FEED] — GOOGLE ADSENSE //</div>
-    </div>
-
     <!-- HOW TO -->
     <section class="panel tilt-card">
       <div class="panel-title">┌── <span class="cyan">HOW_TO_USE</span> ──┐</div>
@@ -137,7 +127,7 @@
         <img src="assets/Ytdl.png" alt="apk" class="apk-icon">
         <div class="apk-info">
           <div class="apk-name">ytdownloader.apk <span class="badge">v1.0</span></div>
-          <div class="apk-desc">native android build — saves directly to your Download folder, works on ANY android version, same C++3D menu, ad-supported (free).</div>
+          <div class="apk-desc">native android build — saves directly to your Download folder, works on ANY android version, same C++3D menu, 100% free.</div>
           <a href="assets/ytdownloader.apk" class="btn btn-download" download>⬇ [ DOWNLOAD_APK ]</a>
         </div>
       </div>
@@ -168,12 +158,6 @@
       <div class="panel-title">┌── <span class="cyan">SETTINGS</span> ──┐</div>
 
       <div class="setting-row">
-        <label for="adsenseId">GOOGLE ADSENSE PUBLISHER ID (ca-pub-XXXX):</label>
-        <input type="text" id="adsenseId" class="input" placeholder="ca-pub-XXXXXXXXXXXXXXXX" autocomplete="off">
-        <div class="term-note">// owner: paste your approved AdSense publisher ID here to activate ads //</div>
-      </div>
-
-      <div class="setting-row">
         <label for="cobaltKey">COBALT API KEY (optional — improves merge quality):</label>
         <input type="text" id="cobaltKey" class="input" placeholder="leave empty for auto" autocomplete="off">
       </div>
@@ -188,12 +172,6 @@
     </section>
   </main>
 
-</div>
-
-<!-- ═══════════ STICKY BOTTOM AD ═══════════ -->
-<div id="adBottom" class="ad-slot ad-bottom" data-ad-slot="bottom">
-  <div class="ad-placeholder">// AD SLOT [BOTTOM] — GOOGLE ADSENSE //</div>
-  <button id="adCloseBtn" class="ad-close" title="close">✕</button>
 </div>
 
 <!-- toast -->
@@ -214,7 +192,6 @@
 </script>
 <script src="js/api.js"></script>
 <script src="js/db.js"></script>
-<script src="js/ads.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

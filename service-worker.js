@@ -1,7 +1,7 @@
-/* ytdownloader service worker — offline app shell cache (v1) */
+/* ytdownloader service worker — offline app shell cache (v2, ads removed) */
 'use strict';
 
-const CACHE = 'ytdownloader-v1';
+const CACHE = 'ytdownloader-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -10,7 +10,6 @@ const ASSETS = [
   './js/app.js',
   './js/api.js',
   './js/db.js',
-  './js/ads.js',
   './assets/Ytdl.png',
   './assets/icon-192.png',
   './assets/icon-512.png',

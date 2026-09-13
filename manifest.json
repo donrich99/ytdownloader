@@ -1,7 +1,7 @@
 {
   "name": "ytdownloader — C++3D Terminal Downloader",
   "short_name": "ytdownloader",
-  "description": "Free YouTube video & audio downloader. Built by dvc. Watch ads to support, downloads are 100% free.",
+  "description": "Free YouTube video & audio downloader. Built by dvc. 100% free forever — supported by donations.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

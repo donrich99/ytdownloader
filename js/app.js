@@ -56,7 +56,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ['linking core: 3d-tilt(2.0) ................... OK', 'ok'],
     ['mounting backend: piped-api .................. OK', 'ok'],
     ['mounting backend: cobalt ..................... READY', 'warn'],
-    ['loading ad-engine (adsense-ready) ............ STANDBY', 'warn'],
     ['loading download-library (indexeddb) ......... OK', 'ok'],
     ['ownership check: dvc ......................... VERIFIED', 'ok'],
     ['build: promode x dvc — full execution ........ OK', 'ok'],
@@ -418,22 +417,35 @@ document.addEventListener('DOMContentLoaded', () => {
       '<p>The Android APK is built natively so that downloads are written straight into your phone\'s Download folder — the same folder your file manager shows you every day. You can see the files, play them, share them, move them, or install them. That is the whole point: <span class="highlight">your downloads belong to you</span>, and they should land somewhere you can actually reach them.</p>',
 
       '<h3>// FREE FOREVER //</h3>',
-      '<p>Yes, you read that right. <span class="highlight">ytdownloader is and will remain 100% free</span>. There is no premium tier hiding the good qualities. There is no "pro" version that unlocks what the free one hides. The best quality, the fastest backend, the full library — everything is in the free version, because there is only one version. One tool. One standard. For everyone.</p>',
+      '<p>Yes, you read that right. <span class="highlight">ytdownloader is and will remain 100% free</span>. There is no premium tier hiding the good qualities. There is no "pro" version that unlocks what the free one hides. There are no ads interrupting your downloads. The best quality, the fastest backend, the full library — everything is in the free version, because there is only one version. One tool. One standard. For everyone.</p>',
 
-      '<h3>// HOW DOES IT STAY FREE? //</h3>',
-      '<p>Servers cost money. Domains cost money. Time costs money. So instead of charging the people who use this tool, the project is sustained the honest way: <span class="highlight">advertisements</span>. If you enjoy using ytdownloader and you want it to keep running, the single best thing you can do is simply watch an ad from time to time. That small act — a few seconds of your attention — keeps the lights on, keeps the backends alive, and keeps the downloads free for the next person, and the next, and the next.</p>',
-      '<p>Think of it this way: every ad you see is you telling the world "I want this tool to exist." Every download you make without paying a cent is the system working exactly as designed. dvc built it so that access is never the price — attention is. And that is a trade most people are happy to make.</p>',
+      '<h3>// HOW DOES IT STAY ALIVE? — DONATIONS //</h3>',
+      '<p>Servers cost money. Domains cost money. Time costs money. And building a tool like this takes real hours and real dedication. But instead of charging the people who use it, instead of stuffing the page with ads that slow everything down, ytdownloader is sustained <span class="highlight">100% by donations</span> — by people like you who believe free tools deserve to exist.</p>',
+      '<p>If ytdownloader has helped you — if you downloaded a video you really needed, if this tool saved you from some shady downloader site, if you simply appreciate that something this good is still free — then the best thing you can do is send a small donation. Even a small amount helps keep the servers online, the backends alive, and the downloads unlimited for the next person, and the next, and the next.</p>',
+      '<p>Every donation is a message that says: <span class="highlight">"I want this tool to stay alive."</span> And every download you make without paying a cent is the system working exactly as designed. dvc built it so that access is never the price — support is voluntary. That is the only deal, and it is a deal most people are happy to make.</p>',
+
+      '<h3>// SUPPORT THE BUILD — GCASH //</h3>',
+      '<div class="donate-box">',
+        '<div class="donate-icon">💚</div>',
+        '<div class="donate-text">',
+          '<div class="donate-title">GCASH DONATION</div>',
+          '<div class="donate-num" id="gcashNum">+63 945 160 0282</div>',
+          '<div class="donate-note">// open your GCash app > Send Money > enter number above //</div>',
+          '<button id="copyGcashBtn" class="btn btn-donate">[ COPY_GCASH_NO ]</button>',
+        '</div>',
+      '</div>',
+      '<p><span class="highlight">Thank you</span> — genuinely — to everyone who donates. You are the reason this tool stays online, stays updated, and stays free for everyone. Every peso keeps the light on.</p>',
 
       '<h3>// THE PROMISE //</h3>',
-      '<p>No spyware. No cryptocurrency miners hidden in the background. No surprise subscriptions. No "download this extra app first" nonsense. No 47 pop-ups before you get your file. Just a straight line between you and the video you want. That line is ytdownloader, and it belongs to you the moment you open it.</p>',
+      '<p>No spyware. No cryptocurrency miners hidden in the background. No surprise subscriptions. No "download this extra app first" nonsense. No 47 pop-ups before you get your file. No ads chasing you around the page. Just a straight line between you and the video you want. That line is ytdownloader, and it belongs to you the moment you open it.</p>',
 
       '<h3>// THE FUTURE //</h3>',
       '<p>This is version 1.0, and it is already working. But the road does not stop here. More backends, more formats, more platforms, better speeds, smoother interfaces — the plan is to keep sharpening this blade until it is the sharpest downloader the web has ever seen. And every single upgrade will stay free, because that is the only version dvc knows how to ship.</p>',
 
       '<h3>// THE FINAL WORDS //</h3>',
-      '<p>If you reached this page, you are part of the story now. You are one of the people who believed that free tools can still be good tools. So go ahead — paste a link, pick a quality, hit download, and enjoy your video. And when you see an ad, remember: that little moment is what keeps this whole thing alive.</p>',
+      '<p>If you reached this page, you are part of the story now. You are one of the people who believed that free tools can still be good tools. So go ahead — paste a link, pick a quality, hit download, and enjoy your video. And if this tool has ever helped you, remember: a small donation is all it takes to make sure it stays here forever.</p>',
       '<p><span class="highlight">Thank you for using ytdownloader.</span> Built with sweat, shipped with love, kept free on purpose.</p>',
-      '<div class="code-block">/* ytdownloader v1.0 | (c) dvc | free forever | watch ads = keep it alive */</div>'
+      '<div class="code-block">/* ytdownloader v1.0 | (c) dvc | free forever | donations = keep it alive */</div>'
     ].join('\n');
   }
 
@@ -442,36 +454,55 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.dataset.rendered) return;
     el.dataset.rendered = '1';
     el.innerHTML = aboutHtml();
+    const copyBtn = $('#copyGcashBtn');
+    if (copyBtn) {
+      copyBtn.addEventListener('click', () => {
+        const num = '+639945160282';
+        const done = () => { copyBtn.textContent = '[ COPIED! ]'; toast('GCash number copied!'); setTimeout(() => { copyBtn.textContent = '[ COPY_GCASH_NO ]'; }, 2200); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(num).then(done).catch(() => fallbackCopy(num, done));
+        } else {
+          fallbackCopy(num, done);
+        }
+      });
+    }
+  }
+
+  function fallbackCopy(text, done) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      done();
+    } catch (e) {
+      toast('// GCash: +639945160282 //', 5000);
+    }
   }
 
   /* ── SETTINGS PAGE ── */
-  const adsenseInput = $('#adsenseId');
   const cobaltInput = $('#cobaltKey');
   const saveBtn = $('#saveSettingsBtn');
   const settingsStatus = $('#settingsStatus');
 
   try {
-    adsenseInput.value = localStorage.getItem('ytdl_adsense_pub') || '';
     cobaltInput.value = localStorage.getItem('ytdl_cobalt_key') || '';
   } catch (e) {}
 
   saveBtn.addEventListener('click', () => {
-    const aId = adsenseInput.value.trim();
     const cKey = cobaltInput.value.trim();
     try {
       localStorage.setItem('ytdl_cobalt_key', cKey);
-    } catch (e) {}
-    const ok = YTADS.setPubId(aId);
-    if (aId && !ok) {
-      settingsStatus.textContent = '// warning: AdSense ID format should be ca-pub-XXXXXXXXXXXXXXXX (16 digits). Saved anyway. //';
-      settingsStatus.className = 'term-note warn';
-    } else if (aId) {
-      settingsStatus.textContent = '// AdSense publisher ID saved. Ads will now load on this device. //';
+      settingsStatus.textContent = '// settings saved //';
       settingsStatus.className = 'term-note green';
-      toast('ads activated!');
-    } else {
-      settingsStatus.textContent = '// settings saved. ads: placeholder mode (owner: add your AdSense ID). //';
-      settingsStatus.className = 'term-note';
+      toast('settings saved');
+    } catch (e) {
+      settingsStatus.textContent = '// error saving settings //';
+      settingsStatus.className = 'term-note err';
     }
   });
 
@@ -489,18 +520,6 @@ document.addEventListener('DOMContentLoaded', () => {
     urlInput.focus();
     setStatus('system: idle', '');
   });
-
-  // ad close button
-  const adClose = $('#adCloseBtn');
-  if (adClose) {
-    adClose.addEventListener('click', () => {
-      const ab = $('#adBottom');
-      ab.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
-      ab.style.transform = 'translateX(-50%) translateY(100%)';
-      ab.style.opacity = '0';
-      setTimeout(() => hide(ab), 320);
-    });
-  }
 
   /* ── HIDE APK SECTION IF INSIDE THE APK ── */
   if (isApk) {
