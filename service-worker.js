@@ -1,7 +1,7 @@
-/* ytdownloader service worker — offline app shell cache (v16, ES5 para sa lumang WebView) */
+/* ytdownloader service worker — v17 (network-first: laging fresh, cache lang kapag offline) */
 'use strict';
 
-var CACHE = 'ytdownloader-v16';
+var CACHE = 'ytdownloader-v17';
 var ASSETS = [
   './',
   './index.html',
@@ -38,24 +38,24 @@ self.addEventListener('activate', function (e) {
 
 self.addEventListener('fetch', function (e) {
   var url = new URL(e.request.url);
-  // network-first for API calls, cache-first for the app shell
+  // same-origin lang ang hinahawakan (app shell + server.txt)
   if (url.origin === location.origin) {
-    // always try network for index.html (fresh), fallback to cache offline
-    if (e.request.mode === 'navigate') {
-      e.respondWith(
-        fetch(e.request)
-          .then(function (res) {
+    e.respondWith(
+      // NETWORK-FIRST: palaging subukan ang network para laging fresh ang JS/HTML
+      // (fallback sa cache kapag offline — kaya gumagana pa rin offline)
+      fetch(e.request)
+        .then(function (res) {
+          if (res && res.ok && e.request.method === 'GET') {
             var copy = res.clone();
             caches.open(CACHE).then(function (c) { return c.put(e.request, copy); });
-            return res;
-          })
-          .catch(function () { return caches.match(e.request).then(function (r) { return r || caches.match('./index.html'); }); })
-      );
-      return;
-    }
-    e.respondWith(
-      caches.match(e.request).then(function (cached) { return cached || fetch(e.request); })
+          }
+          return res;
+        })
+        .catch(function () {
+          return caches.match(e.request).then(function (r) { return r || caches.match('./index.html'); });
+        })
     );
+    return;
   }
-  // external: pass through
+  // external (selfhost tunnel/API): pass through
 });

@@ -971,6 +971,50 @@ document.addEventListener('DOMContentLoaded', function () {
     var s = $('#downloadAppSection');
     if (s) hide(s);
   }
+  // ── SELF-HOST SERVER MONITOR (automation) ──────────────────
+  // Bawat 15s: i-ping ang selfhost server.
+  //  buhay  → status badge = ► server online (green)
+  //  patay  → auto-fetch fresh server.txt → bagong tunnel URL →
+  //           i-update ang input + localStorage → re-probe →
+  //           kung buhay = 'reconnected' (toast + green)
+  //  patay pa rin → badge = ✕ offline (red), patuloy mag-poll
+  // Pagka-start ni @dvc ng server (bash restart_ytd.sh), ang app
+  // ay awtomatikong kukuha ng bagong URL at babalik sa normal.
+  var serverBadge = $('#serverStatusBadge');
+  function setServerBadge(status, detail) {
+    if (!serverBadge) return;
+    var cls = 'server-badge';
+    var label;
+    if (status === 'alive') { cls += ' alive'; label = 'server online'; }
+    else if (status === 'reconnected') { cls += ' alive'; label = 'server re-connected ✓'; }
+    else if (status === 'checking') { cls += ' checking'; label = 'checking server…'; }
+    else if (status === 'dead') { cls += ' dead'; label = 'server offline — waiting…'; }
+    else { cls += ' checking'; label = '…'; }
+    serverBadge.className = cls;
+    serverBadge.textContent = label;
+  }
+  function setupServerMonitor() {
+    if (YTD.serverMonitor && typeof YTD.serverMonitor.start === 'function') {
+      YTD.serverMonitor.onStatus(function (status, detail) {
+        setServerBadge(status, detail);
+        if (status === 'reconnected' && detail) {
+          // sync ang input sa bagong URL + ipaalam sa user
+          serverInput.value = detail.url || '';
+          try { window.localStorage.setItem('ytd_selfhost_url', detail.url || ''); } catch (e) {}
+          toast('Server reconnected — new tunnel detected ✓', 4000);
+          renderBackendStatus();
+        } else if (status === 'alive' && detail && detail.url) {
+          if (serverInput.value !== detail.url) serverInput.value = detail.url;
+        } else if (status === 'dead') {
+          serverInput.classList.add('input-state-dead');
+        } else {
+          serverInput.classList.remove('input-state-dead');
+        }
+      });
+      YTD.serverMonitor.start();
+    }
+  }
   initCobalt();
+  setupServerMonitor();
   runBoot();
 });

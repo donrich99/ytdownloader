@@ -120,7 +120,9 @@
         <div class="backend-row">
           <input type="url" id="serverUrlInput" class="input" placeholder="https://your-server.trycloudflare.com" autocomplete="off" spellcheck="false">
           <button id="saveServerBtn" class="btn btn-small">Save</button>
+          <span id="serverStatusBadge" class="server-badge" title="server connection status">⏳ ...</span>
         </div>
+        <div class="term-note dim-note" id="serverAutoNote">Self-host automation is ON: the app pings your server every 15s. Kung buhay ang server, tuloy ang download. Kung patay (naka-off ang terminal), awtomatikong kumukuha ng bagong tunnel URL mula server.txt at nag-re-connect pagka-start mo ulit ng server.</div>
         <div class="term-note dim-note">Paste your own yt-dlp server URL here. When set, the app uses your server to download &amp; merge videos (best MP4 H264 + audio) — the guaranteed path even if every public backend is down.</div>
         <div class="backend-section-label">Cobalt API (public fallback)</div>
         <div class="backend-row">
@@ -201,15 +203,16 @@
 <div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
-  <span>ytdownloader v2.8 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+  <span>ytdownloader v2.9 · built by <b>dvc</b> · 100% free · supported by your donations</span>
 </footer>
 
 <script src="js/polyfills.js"></script>
 <script>
   // PWA service worker registration (ES5 para sa lumang WebView)
+  // ?v=17 + updateViaCache:'none' → puwersahang i-fetch ang fresh SW script (bypass CDN cache)
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js').catch(function () {});
+      navigator.serviceWorker.register('service-worker.js?v=17', { updateViaCache: 'none' }).catch(function () {});
     });
   }
   window.addEventListener('beforeinstallprompt', function (e) {

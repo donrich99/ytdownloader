@@ -1609,5 +1609,75 @@ var YTD = {
     }
     if (YTD._turnstileReady) return 'waiting for Turnstile…';
     return 'no auth — use cobalt.tools fallback or add Api-Key';
+  },
+  checkServerHealth: function checkServerHealth(base) {
+    if (!base) return Promise.resolve(false);
+    return YTD.fetchJson(base + '/api/v1/health', 8000).then(function (h) {
+      return !!(h && h.status === 'ok');
+    }).catch(function () { return false; });
+  },
+  // ── SELF-HOST SERVER MONITOR (automation) ──────────────
+  // bawat N segundo: i-ping ang server health.
+  //   buhay  → manatili sa kasalukuyang URL (status 'alive')
+  //   patay  → auto-fetch ng fresh server.txt → kung bago ang URL,
+  //            i-update ang localStorage at subukan ang bago (status 'reconnected')
+  //   wala pa ring bago → patuloy na mag-poll (status 'dead') hanggang
+  //            mag-start ulit si @dvc ng server → awtomatikong maka-recover.
+  serverMonitor: {
+    _timer: null,
+    _interval: 15000,
+    _status: 'off',
+    _cbs: [],
+    _checking: false,
+    onStatus: function (cb) {
+      if (typeof cb === 'function') this._cbs.push(cb);
+    },
+    _emit: function (status, detail) {
+      this._status = status;
+      for (var i = 0; i < this._cbs.length; i++) {
+        try { this._cbs[i](status, detail); } catch (e) {}
+      }
+    },
+    start: function () {
+      if (this._timer) return;
+      this._timer = setInterval((function () { this._tick(); }).bind(this), this._interval);
+      this._tick();
+    },
+    stop: function () {
+      if (this._timer) { clearInterval(this._timer); this._timer = null; }
+    },
+    isAlive: function () {
+      return this._status === 'alive' || this._status === 'reconnected';
+    },
+    _tick: function () {
+      var self = this;
+      if (self._checking) return;
+      var base = YTD.getSelfHostUrl();
+      if (!base) { self._emit('off'); return; }
+      self._checking = true;
+      self._emit('checking');
+      YTD.checkServerHealth(base).then(function (ok) {
+        if (ok) { self._checking = false; self._emit('alive', { url: base }); return; }
+        // patay ang kasalukuyang URL → kumuha ng fresh server.txt
+        return YTD.fetchServerTxtUrl().then(function (fresh) {
+          if (fresh && fresh !== base) {
+            YTD.setSelfHostUrl(fresh);
+            return YTD.checkServerHealth(fresh).then(function (ok2) {
+              self._checking = false;
+              if (ok2) self._emit('reconnected', { url: fresh, old: base });
+              else self._emit('dead', { url: fresh });
+            });
+          }
+          self._checking = false;
+          self._emit('dead', { url: base });
+        }).catch(function () {
+          self._checking = false;
+          self._emit('dead', { url: base });
+        });
+      }).catch(function () {
+        self._checking = false;
+        self._emit('dead', { url: base });
+      });
+    }
   }
 };
