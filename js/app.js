@@ -616,7 +616,7 @@ document.addEventListener('DOMContentLoaded', () => {
       '<div class="about-logo"><img src="assets/Ytdl.png" alt="ytdownloader"></div>',
 
       '<h3>THE CREATOR — dvc</h3>',
-      '<p>ytdownloader was designed, engineered, and shipped by <span class="highlight">dvc</span> — a builder who believes that technology should be free, fast, and honest. No corporations, no middlemen, no hidden paywalls, no tricks. Just a clean tool and the will to make video downloading simple for everyone on this planet.</p>',
+      '<p>ytdownloader was designed, engineered, and shipped by <span class="highlight">dvc</span> — a builder who believes that technology should be free, fast, and honest. No corporations, no middlemen, no hidden paywalls, no tricks. Just a clean tool and the will to make video downloading simple for everyone — wherever you are, whatever device you use.</p>',
 
       '<h3>THE PHILOSOPHY</h3>',
       '<p>Almost every so-called "free" downloader on the internet is either full of clickbait, riddled with malware, locked behind premium subscriptions, or quietly harvesting your data. dvc saw that mess and built the opposite — a lean, honest tool that treats you like a human being, not like a product.</p>',
