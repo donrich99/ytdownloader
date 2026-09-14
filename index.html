@@ -201,17 +201,18 @@
 <div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
-  <span>ytdownloader v2.6 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+  <span>ytdownloader v2.7 · built by <b>dvc</b> · 100% free · supported by your donations</span>
 </footer>
 
+<script src="js/polyfills.js"></script>
 <script>
-  // PWA service worker registration
-  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  // PWA service worker registration (ES5 para sa lumang WebView)
+  if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('service-worker.js').catch(function () {});
     });
   }
-  window.addEventListener('beforeinstallprompt', (e) => {
+  window.addEventListener('beforeinstallprompt', function (e) {
     e.preventDefault();
     window._deferredInstall = e;
   });

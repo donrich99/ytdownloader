@@ -1,12 +1,13 @@
-/* ytdownloader service worker — offline app shell cache (v2, ads removed) */
+/* ytdownloader service worker — offline app shell cache (v15, ES5 para sa lumang WebView) */
 'use strict';
 
-const CACHE = 'ytdownloader-v14';
-const ASSETS = [
+var CACHE = 'ytdownloader-v15';
+var ASSETS = [
   './',
   './index.html',
   './manifest.json',
   './css/style.css',
+  './js/polyfills.js',
   './js/app.js',
   './js/api.js',
   './js/db.js',
@@ -17,41 +18,43 @@ const ASSETS = [
   './assets/favicon.ico'
 ];
 
-self.addEventListener('install', (e) => {
+self.addEventListener('install', function (e) {
   e.waitUntil(
     caches.open(CACHE)
-      .then((c) => c.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then(function (c) { return c.addAll(ASSETS); })
+      .then(function () { return self.skipWaiting(); })
   );
 });
 
-self.addEventListener('activate', (e) => {
+self.addEventListener('activate', function (e) {
   e.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
+      .then(function (keys) {
+        return Promise.all(keys.filter(function (k) { return k !== CACHE; }).map(function (k) { return caches.delete(k); }));
+      })
+      .then(function () { return self.clients.claim(); })
   );
 });
 
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
+self.addEventListener('fetch', function (e) {
+  var url = new URL(e.request.url);
   // network-first for API calls, cache-first for the app shell
   if (url.origin === location.origin) {
     // always try network for index.html (fresh), fallback to cache offline
     if (e.request.mode === 'navigate') {
       e.respondWith(
         fetch(e.request)
-          .then((res) => {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, copy));
+          .then(function (res) {
+            var copy = res.clone();
+            caches.open(CACHE).then(function (c) { return c.put(e.request, copy); });
             return res;
           })
-          .catch(() => caches.match(e.request).then((r) => r || caches.match('./index.html')))
+          .catch(function () { return caches.match(e.request).then(function (r) { return r || caches.match('./index.html'); }); })
       );
       return;
     }
     e.respondWith(
-      caches.match(e.request).then((cached) => cached || fetch(e.request))
+      caches.match(e.request).then(function (cached) { return cached || fetch(e.request); })
     );
   }
   // external: pass through
