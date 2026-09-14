@@ -788,7 +788,7 @@ const YTD = {
      DOWNLOAD EXECUTION (browser)
      Streams to blob; on CORS failure → new-tab fallback.
      ═══════════════════════════════════════════════ */
-  async downloadStream(url, filename) {
+  downloadStream(url, filename) {
     const ctrl = new AbortController();
     const task = { ctrl, done: false, error: null, aborted: false, usedFallback: false };
 
