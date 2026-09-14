@@ -203,7 +203,7 @@
 <div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
-  <span>ytdownloader v2.10 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+  <span>ytdownloader v2.11 · built by <b>dvc</b> · 100% free · supported by your donations</span>
 </footer>
 
 <script src="js/polyfills.js"></script>
@@ -212,7 +212,7 @@
   // ?v=17 + updateViaCache:'none' → puwersahang i-fetch ang fresh SW script (bypass CDN cache)
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js?v=17', { updateViaCache: 'none' }).catch(function () {});
+      navigator.serviceWorker.register('service-worker.js?v=18', { updateViaCache: 'none' }).catch(function () {});
     });
   }
   window.addEventListener('beforeinstallprompt', function (e) {

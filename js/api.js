@@ -1262,113 +1262,114 @@ var YTD = {
     }))();
   },
   downloadStream: function downloadStream(url, filename) {
-    var ctrl = new AbortController();
+    var MAX_RETRIES = 3;
+    var IDLE_MS = 20000;
+    var mainCtrl = new AbortController();
     var task = {
-      ctrl: ctrl,
+      ctrl: mainCtrl,
       done: false,
       error: null,
       aborted: false,
-      usedFallback: false
+      usedFallback: false,
+      _attempt: 0
     };
-    _asyncToGenerator(_regenerator().m(function _callee1() {
-      var resp, total, reader, chunks, received, _yield$reader$read, done, value, type, blob, objUrl, a, w, _t17, _t18;
-      return _regenerator().w(function (_context12) {
-        while (1) switch (_context12.p = _context12.n) {
-          case 0:
-            _context12.p = 0;
-            _context12.n = 1;
-            return fetch(url, {
-              signal: ctrl.signal,
-              headers: {
-                'Accept': '*/*'
-              }
-            });
-          case 1:
-            resp = _context12.v;
-            if (resp.ok) {
-              _context12.n = 2;
-              break;
+    function failTask(e) {
+      if (task.aborted) return;
+      var w = window.open(url, '_blank');
+      if (w) {
+        task.usedFallback = true;
+        task.done = true;
+        task.fallbackMsg = 'opened in new tab — save from there (direct save blocked)';
+      } else {
+        task.error = e;
+      }
+    }
+    function attempt() {
+      if (task.aborted) return;
+      task._attempt++;
+      var ctrl = new AbortController();
+      var onMainAbort = function () { ctrl.abort(); };
+      mainCtrl.signal.addEventListener('abort', onMainAbort);
+      var idleTimer = null;
+      var chunks = [];
+      var received = 0;
+      var idleFired = false;
+      function clearIdle() {
+        if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+      }
+      function armIdle() {
+        clearIdle();
+        idleTimer = setTimeout(function () {
+          idleFired = true;
+          ctrl.abort();
+          clearIdle();
+        }, IDLE_MS);
+      }
+      armIdle();
+      fetch(url, {
+        signal: ctrl.signal,
+        headers: { 'Accept': '*/*' }
+      }).then(function (resp) {
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        var total = +(resp.headers.get('Content-Length') || 0);
+        var reader = resp.body.getReader();
+        armIdle();
+        function pump() {
+          if (task.aborted) {
+            try { reader.cancel(); } catch (e) {}
+            return Promise.resolve();
+          }
+          return reader.read().then(function (res) {
+            if (task.aborted) return;
+            if (res.done) {
+              clearIdle();
+              var type = resp.headers.get('Content-Type') || 'video/mp4';
+              var blob = new Blob(chunks, { type: type });
+              var objUrl = URL.createObjectURL(blob);
+              var a = document.createElement('a');
+              a.href = objUrl;
+              a.download = filename;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              setTimeout(function () { URL.revokeObjectURL(objUrl); }, 120000);
+              task.done = true;
+              task.blobUrl = objUrl;
+              return;
             }
-            throw new Error('HTTP ' + resp.status);
-          case 2:
-            total = +(resp.headers.get('Content-Length') || 0);
-            reader = resp.body.getReader();
-            chunks = [];
-            received = 0;
-          case 3:
-            if (!true) {
-              _context12.n = 6;
-              break;
-            }
-            _context12.n = 4;
-            return reader.read();
-          case 4:
-            _yield$reader$read = _context12.v;
-            done = _yield$reader$read.done;
-            value = _yield$reader$read.value;
-            if (!done) {
-              _context12.n = 5;
-              break;
-            }
-            return _context12.a(3, 6);
-          case 5:
-            chunks.push(value);
-            received += value.length;
+            chunks.push(res.value);
+            received += res.value.length;
             if (task.onProgress) task.onProgress(received, total);
-            _context12.n = 3;
-            break;
-          case 6:
-            type = resp.headers.get('Content-Type') || 'video/mp4';
-            blob = new Blob(chunks, {
-              type: type
-            });
-            objUrl = URL.createObjectURL(blob);
-            a = document.createElement('a');
-            a.href = objUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(function () {
-              return URL.revokeObjectURL(objUrl);
-            }, 120000);
-            task.done = true;
-            task.blobUrl = objUrl;
-            _context12.n = 12;
-            break;
-          case 7:
-            _context12.p = 7;
-            _t17 = _context12.v;
-            if (!(_t17.name === 'AbortError')) {
-              _context12.n = 8;
-              break;
+            armIdle();
+            return pump();
+          }).catch(function (e) {
+            clearIdle();
+            if (task.aborted) {
+              try { reader.cancel(); } catch (e2) {}
+              return Promise.resolve();
             }
-            task.aborted = true;
-            return _context12.a(2);
-          case 8:
-            _context12.p = 8;
-            w = window.open(url, '_blank');
-            if (!w) {
-              _context12.n = 9;
-              break;
+            if (task._attempt < MAX_RETRIES) {
+              if (task.onRetry) task.onRetry(task._attempt, e);
+              attempt();
+              return Promise.resolve();
             }
-            task.usedFallback = true;
-            task.done = true;
-            task.fallbackMsg = 'opened in new tab — save from there (direct save blocked)';
-            return _context12.a(2);
-          case 9:
-            _context12.n = 11;
-            break;
-          case 10:
-            _context12.p = 10;
-            _t18 = _context12.v;
-          case 11:
-            task.error = _t17;
-          case 12:
-            return _context12.a(2);
+            failTask(e);
+            return Promise.resolve();
+          });
         }
-      }, _callee1, null, [[8, 10], [0, 7]]);
-    }))();
+        return pump();
+      }).catch(function (e) {
+        clearIdle();
+        if (task.aborted) return;
+        if (task._attempt < MAX_RETRIES) {
+          if (task.onRetry) task.onRetry(task._attempt, e);
+          attempt();
+          return;
+        }
+        failTask(e);
+      });
+    }
+    attempt();
     return task;
   },
   cancelTask: function cancelTask(task) {

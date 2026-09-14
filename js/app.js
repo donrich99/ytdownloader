@@ -548,6 +548,10 @@ document.addEventListener('DOMContentLoaded', function () {
             _context5.p = 6;
             state.currentTask = YTD.downloadStream(q.url, filename);
             state.currentTask._t0 = Date.now();
+            state.currentTask.onRetry = function (n) {
+              termLog('[C++ WGET] stream stalled — retrying (' + n + '/3) …', 'warn');
+              setStatus('connection stalled — retrying transfer…', 'cpp');
+            };
             state.currentTask.onProgress = function (recv, total) {
               var pct = total ? Math.min(100, Math.round(recv / total * 100)) : 0;
               $('#progressFill').style.width = pct + '%';
@@ -685,6 +689,10 @@ document.addEventListener('DOMContentLoaded', function () {
           case 5:
             state.currentTask = YTD.downloadStream(fileUrl, filename);
             state.currentTask._t0 = Date.now();
+            state.currentTask.onRetry = function (n) {
+              termLog('[C++ WGET] stream stalled — retrying (' + n + '/3) …', 'warn');
+              setStatus('connection stalled — retrying transfer…', 'cpp');
+            };
             state.currentTask.onProgress = function (recv, total) {
               var pct = total ? Math.min(100, Math.round(recv / total * 100)) : 0;
               $('#progressFill').style.width = pct + '%';

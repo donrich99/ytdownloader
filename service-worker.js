@@ -1,7 +1,7 @@
 /* ytdownloader service worker — v17 (network-first: laging fresh, cache lang kapag offline) */
 'use strict';
 
-var CACHE = 'ytdownloader-v17';
+var CACHE = 'ytdownloader-v18';
 var ASSETS = [
   './',
   './index.html',
