@@ -1462,7 +1462,10 @@ var YTD = {
             throw new Error('selfhost: not configured');
           case 1:
             _context14.n = 2;
-            return YTD.fetchJson(base + '/api/v1/info?url=' + encodeURIComponent(url), 25000);
+            return YTD.fetchJson(base + '/api/v1/health', 8000).then(function (h) {
+              if (!h || h.status !== 'ok') throw new Error('selfhost: server down');
+              return YTD.fetchJson(base + '/api/v1/info?url=' + encodeURIComponent(url), 25000);
+            });
           case 2:
             info = _context14.v;
             if (!(!info || info.status === 'error')) {

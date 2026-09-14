@@ -249,10 +249,6 @@ document.addEventListener('DOMContentLoaded', function () {
             savedSh = YTD.getSelfHostUrl();
             if (savedSh) serverInput.value = savedSh;
             renderBackendStatus();
-            if (YTD.getSelfHostUrl()) {
-              _context3.n = 9;
-              break;
-            }
             _context3.p = 4;
             _context3.n = 5;
             return fetch('./server.txt?ts=' + Date.now(), {
@@ -269,10 +265,12 @@ document.addEventListener('DOMContentLoaded', function () {
           case 6:
             u = _context3.v.trim().replace(/\/+$/, '');
             if (/^https:\/\/.+\.trycloudflare\.com$/.test(u)) {
-              YTD.setSelfHostUrl(u);
-              serverInput.value = u;
-              renderBackendStatus();
-              toast('Your download server connected ✓', 3200);
+              if (u !== savedSh) {
+                YTD.setSelfHostUrl(u);
+                serverInput.value = u;
+                renderBackendStatus();
+                toast('Your download server connected ✓', 3200);
+              }
             }
           case 7:
             _context3.n = 9;

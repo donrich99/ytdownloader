@@ -1,7 +1,7 @@
-/* ytdownloader service worker — offline app shell cache (v15, ES5 para sa lumang WebView) */
+/* ytdownloader service worker — offline app shell cache (v16, ES5 para sa lumang WebView) */
 'use strict';
 
-var CACHE = 'ytdownloader-v15';
+var CACHE = 'ytdownloader-v16';
 var ASSETS = [
   './',
   './index.html',
