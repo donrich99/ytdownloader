@@ -1,7 +1,7 @@
 /* ytdownloader service worker — offline app shell cache (v2, ads removed) */
 'use strict';
 
-const CACHE = 'ytdownloader-v13';
+const CACHE = 'ytdownloader-v14';
 const ASSETS = [
   './',
   './index.html',

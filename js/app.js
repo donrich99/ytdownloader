@@ -63,11 +63,32 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ── NAV ── */
+  function renderTutorial() {
+    // TUTORIAL VIDEO: app → tutorial/app.mp4, website → tutorial/webpage.mp4
+    // (parehong video na ginawa ni dvc — optimized para sa web; hosted sa GitHub,
+    //  hindi sa term server, para hindi ma-ubos ang data ng server)
+    const vid = $('#tutorialVideo');
+    if (!vid) return;
+    const src = isApk ? 'assets/tutorial/app.mp4' : 'assets/tutorial/webpage.mp4';
+    if (vid.dataset.src !== src) {
+      vid.dataset.src = src;
+      vid.src = src;
+      vid.load();
+    }
+    const hint = $('#tutorialHint');
+    if (hint) {
+      hint.textContent = isApk
+        ? '// tutorial video for the ytdownloader Android app //'
+        : '// tutorial video for the ytdownloader website — ' + src + ' //';
+    }
+  }
+
   function switchPage(name) {
     $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.page === name));
     $$('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + name));
     if (name === 'library') renderLibrary();
     if (name === 'about') renderAbout();
+    if (name === 'tutorial') renderTutorial();
     window.scrollTo({ top: 0 });
   }
   $$('.nav-btn').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));

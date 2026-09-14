@@ -43,6 +43,7 @@
     <nav class="nav" id="navMenu">
       <button class="nav-btn active" data-page="home">Download</button>
       <button class="nav-btn" data-page="library">Library</button>
+      <button class="nav-btn" data-page="tutorial">Tutorial</button>
       <button class="nav-btn" data-page="about">About</button>
     </nav>
   </header>
@@ -163,6 +164,22 @@
       <div class="term-note">// downloads recorded on this device //</div>
       <div id="libraryList" class="library-list"></div>
       <button id="clearLibraryBtn" class="btn btn-danger hidden">Clear library</button>
+    </section>
+  </main>
+
+  <!-- ═══════════ PAGE: TUTORIAL ═══════════ -->
+  <main id="page-tutorial" class="page">
+    <section class="panel">
+      <h2 class="section-title">Tutorial</h2>
+      <div class="term-note" id="tutorialNote">// how to use ytdownloader //</div>
+      <div class="tutorial-box">
+        <div class="tutorial-video-wrap">
+          <video id="tutorialVideo" class="tutorial-video" controls playsinline preload="metadata" poster="assets/Ytdl.png">
+            Your browser doesn't support HTML5 video playback.
+          </video>
+        </div>
+        <div class="term-note" id="tutorialHint"></div>
+      </div>
     </section>
   </main>
 
