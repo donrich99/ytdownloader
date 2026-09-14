@@ -922,10 +922,12 @@ const YTD = {
     return data.task_id;
   },
 
-  /* poll until done → absolute file URL */
-  async selfHostPoll(taskId, onUpdate) {
+  /* poll until done → absolute file URL
+     maxWaitMs: hangganang oras (default 10 min) para hindi mag-hang forever */
+  async selfHostPoll(taskId, onUpdate, maxWaitMs = 600000) {
     const base = YTD.getSelfHostUrl();
-    while (true) {
+    const deadline = Date.now() + maxWaitMs;
+    while (Date.now() < deadline) {
       await new Promise((r) => setTimeout(r, 1250));
       let p = null;
       try {
@@ -935,6 +937,7 @@ const YTD = {
       if (p && p.status === 'done' && p.file) return base + p.file;
       if (p && p.status === 'error') throw new Error('server: ' + (p.error || 'failed'));
     }
+    throw new Error('server took too long — task may have timed out, try again');
   },
 
   /* can the app talk to the cobalt API right now? */
