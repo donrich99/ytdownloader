@@ -165,6 +165,24 @@ document.addEventListener('DOMContentLoaded', () => {
     const savedSh = YTD.getSelfHostUrl();
     if (savedSh) serverInput.value = savedSh;
     renderBackendStatus();
+
+    /* kung walang naka-save na server URL → subukang kunin mula sa server.txt
+       (na-click lang ng `git push`, ina-update ko ito tuwing mag-restart ang tunnel) */
+    if (!YTD.getSelfHostUrl()) {
+      try {
+        const r = await fetch('./server.txt?ts=' + Date.now(), { cache: 'no-store' });
+        if (r.ok) {
+          const u = (await r.text()).trim().replace(/\/+$/, '');
+          if (/^https:\/\/.+\.trycloudflare\.com$/.test(u)) {
+            YTD.setSelfHostUrl(u);
+            serverInput.value = u;
+            renderBackendStatus();
+            toast('Your download server connected ✓', 3200);
+          }
+        }
+      } catch (e) { /* offline / no file */ }
+    }
+
     /* turnstile solves session automatically for cobalt auth */
     if (!YTD.hasCobaltKey()) {
       try { YTD.initTurnstile(); } catch (e) {}
