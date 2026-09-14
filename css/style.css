@@ -246,6 +246,23 @@ body {
 }
 .term-note.green { color: var(--green); }
 .term-note.err { color: var(--red-dark); }
+/* C++ terminal style para sa statusLine — glow + green */
+.term-note.cpp {
+  color: var(--term-green, #00ff9c);
+  text-shadow: 0 0 8px rgba(0,255,156,.5), 0 0 2px rgba(0,255,156,.8);
+  letter-spacing: .4px;
+}
+.term-note.cpp::before { content: '◆ '; color: var(--term-cyan, #00d4ff); text-shadow: 0 0 8px rgba(0,212,255,.5); }
+.term-note.cpp.err {
+  color: var(--term-red, #ff6b6b);
+  text-shadow: 0 0 8px rgba(255,107,107,.5);
+  animation: cppShake .4s ease;
+}
+@keyframes cppShake {
+  0%,100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
 
 /* ═══════════ VIDEO INFO ═══════════ */
 .video-info {

@@ -377,10 +377,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // BROWSER — stream to blob, then save
-    setStatus('downloading — ' + filename, '');
+    setStatus('downloading — ' + filename, 'cpp');
     show($('#progressPanel'));
     hide($('#resultPanel'));
     termBoot();
+    setTimeout(() => { try { $('#progressPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {} }, 120);
     $('#progressLabel').textContent = 'downloading ' + q.label + ' ...';
     $('#progressFill').style.width = '0%';
     $('#progressStats').textContent = '';
@@ -423,10 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const ytUrl = state.resolvedUrl || urlInput.value.trim();
     if (!ytUrl) { toast('No source URL — paste the link again'); return; }
 
-    setStatus('server: preparing download…', '');
+    setStatus('server: preparing download…', 'cpp');
     show($('#progressPanel'));
     hide($('#resultPanel'));
     termBoot();
+    setTimeout(() => { try { $('#progressPanel').scrollIntoView({ behavior: 'smooth', block: 'nearest' }); } catch (e) {} }, 120);
     $('#progressLabel').textContent = 'server is preparing ' + q.label + ' …';
     $('#progressFill').style.width = '0%';
     $('#progressStats').textContent = '';
@@ -459,6 +461,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const st = p.status || '';
         $('#progressStats').textContent = (st === 'processing' ? 'merging video+audio …' : (st === 'downloading' ? 'downloading from YouTube: ' : '')) + (p.message || '');
         $('#progressLabel').textContent = st === 'processing' ? 'merging on server…' : ('server · ' + q.label);
+        setStatus(st === 'processing' ? 'server: merging video+audio …' : 'server: downloading ' + pct + '%', 'cpp');
       });
 
       // 3) stream the finished file to the device
