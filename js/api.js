@@ -660,21 +660,40 @@ const YTD = {
        Kapag may naka-set na server URL, subukan muna ito AGAD.
        Kung gumana → i-return kaagad (no waiting for dead backends).
        Kung patay ang server URL (nag-restart ang tunnel) →
-       i-refresh mula sa server.txt at subukan ulit. */
+       RETRY LOOP: i-refresh mula sa server.txt at subukan ulit
+       hanggang 8 beses (5s pagitan = ~40s window) para i-ride out
+       ang tunnel restart window ng watchdog. */
+
+    // ── helper: subukan ang selfhost isang beses ──
+    const trySelfHostOnce = async () => {
+      const sh = await YTD.probeSelfHost(url);
+      return (sh && sh.qualities && sh.qualities.length) ? sh : null;
+    };
+
+    const selfHostAttempts = 3;           // 3 × (probe + 3s sleep) ≈ mabilis na 10s window
+    const selfHostIntervalMs = 3000;      // hintay sa pagitan ng retry — para sa manual restart
+
     if (YTD.getSelfHostUrl()) {
-      try {
-        const sh = await YTD.probeSelfHost(url);
-        if (sh && sh.qualities && sh.qualities.length) return sh;
-      } catch (e) {
-        errors.push('selfhost: ' + e.message);
+      for (let attempt = 0; attempt < selfHostAttempts; attempt++) {
         try {
-          const fresh = await YTD.fetchServerTxtUrl();
-          if (fresh && fresh !== YTD.getSelfHostUrl()) {
-            YTD.setSelfHostUrl(fresh);
-            const sh2 = await YTD.probeSelfHost(url);
-            if (sh2 && sh2.qualities && sh2.qualities.length) return sh2;
-          }
-        } catch (e2) { /* keep going */ }
+          const sh = await trySelfHostOnce();
+          if (sh) return sh;
+          // bumalik na walang error pero walang laman → refresh + ituloy
+        } catch (e) {
+          if (attempt === 0) errors.push('selfhost: ' + e.message);
+          // i-refresh ang server.txt — kung nag-restart ka (manual),
+          // may BAGONG URL na ito at kukunin ito ng site automatic
+          try {
+            const fresh = await YTD.fetchServerTxtUrl();
+            if (fresh && fresh !== YTD.getSelfHostUrl()) {
+              YTD.setSelfHostUrl(fresh);
+            }
+          } catch (e2) { /* keep going */ }
+        }
+        // last attempt? → wag na maghintay, tapusin na
+        if (attempt < selfHostAttempts - 1) {
+          await new Promise((r) => setTimeout(r, selfHostIntervalMs));
+        }
       }
     }
 
