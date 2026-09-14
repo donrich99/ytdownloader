@@ -97,11 +97,18 @@
       </div>
     </section>
 
-    <!-- BACKEND STATUS & SETTINGS (cobalt v11 auth) -->
+    <!-- BACKEND STATUS & SETTINGS (self-host server + cobalt v11 auth) -->
     <details class="panel backend-panel" id="backendPanel">
       <summary>Backend status &amp; settings</summary>
       <div class="backend-box">
         <div class="backend-status" id="backendStatus">// checking backends... //</div>
+        <div class="backend-section-label">Your own download server (recommended — guaranteed)</div>
+        <div class="backend-row">
+          <input type="url" id="serverUrlInput" class="input" placeholder="https://your-server.trycloudflare.com" autocomplete="off" spellcheck="false">
+          <button id="saveServerBtn" class="btn btn-small">Save</button>
+        </div>
+        <div class="term-note dim-note">Paste your own yt-dlp server URL here. When set, the app uses your server to download &amp; merge videos (best MP4 H264 + audio) — the guaranteed path even if every public backend is down.</div>
+        <div class="backend-section-label">Cobalt API (public fallback)</div>
         <div class="backend-row">
           <input type="text" id="cobaltKeyInput" class="input" placeholder="Cobalt API key (optional — sk_...)" autocomplete="off" spellcheck="false">
           <button id="saveKeyBtn" class="btn btn-small">Save</button>
@@ -164,7 +171,7 @@
 <div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
-  <span>ytdownloader v2.2 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+  <span>ytdownloader v2.3 · built by <b>dvc</b> · 100% free · supported by your donations</span>
 </footer>
 
 <script>

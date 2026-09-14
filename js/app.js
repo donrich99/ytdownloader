@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $$('.nav-btn').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
 
   /* ── STATE ── */
-  const state = { resolved: null, activeQuality: null, currentTask: null };
+  const state = { resolved: null, resolvedUrl: null, activeQuality: null, currentTask: null };
 
   function setStatus(msg, cls) {
     const el = $('#statusLine');
@@ -81,11 +81,13 @@ document.addEventListener('DOMContentLoaded', () => {
     el.className = 'term-note ' + (cls || '');
   }
 
-  /* ── SETTINGS (cobalt key + turnstile auto-session) ── */
+  /* ── SETTINGS (cobalt key + self-host server + turnstile auto-session) ── */
   function getSettings() {
     let cobaltKey = '';
     try { cobaltKey = localStorage.getItem('ytd_cobalt_key') || ''; } catch (e) {}
-    return { cobaltKey };
+    let selfHostUrl = '';
+    try { selfHostUrl = localStorage.getItem('ytd_selfhost_url') || ''; } catch (e) {}
+    return { cobaltKey, selfHostUrl };
   }
 
   function saveCobaltKey(k) {
@@ -99,12 +101,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const keyInput = $('#cobaltKeyInput');
   const saveKeyBtn = $('#saveKeyBtn');
+  const serverInput = $('#serverUrlInput');
+  const saveServerBtn = $('#saveServerBtn');
+
+  function saveServerUrl() {
+    const val = serverInput.value.trim();
+    YTD.setSelfHostUrl(val);
+    toast(val ? 'Server URL saved — using your own backend' : 'Server URL cleared');
+    renderBackendStatus();
+  }
 
   async function renderBackendStatus() {
     const el = $('#backendStatus');
     if (!el) return;
     const info = YTD._serverInfo;
     el.innerHTML = '';
+    const sh = YTD.getSelfHostUrl();
 
     const add = (k, v, cls) => {
       const row = document.createElement('div');
@@ -113,10 +125,18 @@ document.addEventListener('DOMContentLoaded', () => {
       el.appendChild(row);
     };
 
+    /* self-hosted backend (sarili mong server — GUARANTEED path) */
+    if (sh) {
+      add('self-host server', sh.replace(/^https?:\/\//, '') + ' ✓', 'green');
+      add('self-host auth', 'own server — recommended path', 'green');
+    } else {
+      add('self-host server', 'not set — using public backends', 'dim');
+    }
+
     if (!info) {
       add('cobalt server', 'unreachable', 'red');
       add('auth', YTD.cobaltAuthStatus(), 'yellow');
-      add('hint', 'The cobalt API is currently unreachable — downloads will fall back to the cobalt web helper.', 'dim');
+      add('hint', 'Set your own server URL above for the guaranteed path. The cobalt API is also unreachable — downloads will fall back to the cobalt web helper.', 'dim');
       return;
     }
 
@@ -139,9 +159,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function initCobalt() {
     try { await YTD.getCobaltServerInfo(); } catch (e) {}
-    /* pre-fill saved key */
+    /* pre-fill saved key + server url */
     const saved = YTD.getCobaltKey();
     if (saved) keyInput.value = saved;
+    const savedSh = YTD.getSelfHostUrl();
+    if (savedSh) serverInput.value = savedSh;
     renderBackendStatus();
     /* turnstile solves session automatically for cobalt auth */
     if (!YTD.hasCobaltKey()) {
@@ -153,6 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (u) YTD.openCobaltWeb(u, 'auto');
     });
   }
+
+  /* callback hook para sa server URL field */ 
+  window.__saveServer = saveServerUrl;
+  saveServerBtn.addEventListener('click', saveServerUrl);
+  serverInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveServerUrl(); });
 
   saveKeyBtn.addEventListener('click', () => saveCobaltKey(keyInput.value));
   keyInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveCobaltKey(keyInput.value); });
@@ -177,6 +204,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const settings = getSettings();
       const res = await YTD.resolve(url, { cobaltKey: settings.cobaltKey });
       state.resolved = res;
+      state.resolvedUrl = url;
       const vi = $('#videoInfo');
       $('#thumbImg').src = res.thumb || 'assets/Ytdl.png';
       $('#videoTitle').textContent = res.title;
@@ -265,7 +293,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return f + '.' + (ext || 'mp4');
   }
   function extFor(q) {
-    if (!q || !q.mime) return 'mp4';
+    if (!q) return 'mp4';
+    if (q.ext && /^(mp4|webm|mkv|m4a|mp3|opus|ogg)$/.test(q.ext)) return q.ext;
+    if (!q.mime) return 'mp4';
     if (q.mime.includes('webm')) return 'webm';
     if (q.mime.includes('mp3')) return 'mp3';
     if (q.mime.includes('m4a')) return 'm4a';
@@ -280,6 +310,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const q = state.activeQuality;
     const res = state.resolved;
     const filename = cleanFilename(res.title, extFor(q));
+
+    // SELF-HOSTED SERVER — server does download+merge, we stream the result
+    if (q.selfhost) {
+      await doSelfHostDownload(q, res, filename);
+      return;
+    }
 
     // ANDROID APK — native bridge saves to real Download folder
     if (isApk && androidDownload(q.url, filename)) {
@@ -329,6 +365,78 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function doSelfHostDownload(q, res, filename) {
+    const ytUrl = state.resolvedUrl || urlInput.value.trim();
+    if (!ytUrl) { toast('No source URL — paste the link again'); return; }
+
+    setStatus('server: preparing download…', '');
+    show($('#progressPanel'));
+    hide($('#resultPanel'));
+    $('#progressLabel').textContent = 'server is preparing ' + q.label + ' …';
+    $('#progressFill').style.width = '0%';
+    $('#progressStats').textContent = '';
+    try {
+      // 1) start server-side task (yt-dlp + ffmpeg on OUR server)
+      const taskId = await YTD.selfHostStart(ytUrl, q, filename);
+      // 2) poll progress until the server finished downloading+merging
+      let lastPct = -1;
+      const fileUrl = await YTD.selfHostPoll(taskId, (p) => {
+        const pct = Math.max(0, Math.min(100, Math.round((p.progress || 0))));
+        if (pct !== lastPct) {
+          lastPct = pct;
+          $('#progressFill').style.width = pct + '%';
+        }
+        const st = p.status || '';
+        $('#progressStats').textContent = (st === 'processing' ? 'merging video+audio …' : (st === 'downloading' ? 'downloading from YouTube: ' : '')) + (p.message || '');
+        $('#progressLabel').textContent = st === 'processing' ? 'merging on server…' : ('server · ' + q.label);
+      });
+
+      // 3) stream the finished file to the device
+      $('#progressLabel').textContent = 'downloading file…';
+      $('#progressFill').style.width = '100%';
+      $('#progressStats').textContent = 'server finished — receiving file…';
+
+      // ANDROID — native bridge saves to real Download folder
+      if (isApk && androidDownload(fileUrl, filename)) {
+        toast('Download started — check your phone Download folder', 4200);
+        recordDownload(res, q, filename, 'server-merge');
+        setStatus('done — saved to phone /Download', 'green');
+        return;
+      }
+
+      // BROWSER — stream final blob
+      state.currentTask = YTD.downloadStream(fileUrl, filename);
+      state.currentTask._t0 = Date.now();
+      state.currentTask.onProgress = (recv, total) => {
+        const pct = total ? Math.min(100, Math.round((recv / total) * 100)) : 0;
+        $('#progressFill').style.width = pct + '%';
+        const spd = recv / Math.max(1, (Date.now() - state.currentTask._t0) / 1000);
+        $('#progressStats').innerHTML = fmtBytes(recv) + (total ? ' / ' + fmtBytes(total) : '') +
+          ' · ' + pct + '%' + ' · ' + fmtBytes(spd) + '/s';
+      };
+      await new Promise((resv, rej) => {
+        const iv = setInterval(() => {
+          const t = state.currentTask;
+          if (!t) { clearInterval(iv); rej(new Error('cancelled')); }
+          else if (t.done) { clearInterval(iv); resv(); }
+          else if (t.error) { clearInterval(iv); rej(t.error); }
+          else if (t.aborted) { clearInterval(iv); rej(new Error('aborted')); }
+        }, 220);
+      });
+      $('#progressFill').style.width = '100%';
+      $('#progressLabel').textContent = 'Done!';
+      recordDownload(res, q, filename, 'server-merge');
+      showResult('<b>Download complete!</b><div class="dim">Merged on your server, saved to your downloads folder.</div>');
+      setStatus('done — saved to downloads', 'green');
+    } catch (err) {
+      hide($('#progressPanel'));
+      showResult('<b>Download failed:</b> ' + esc(err.message));
+      setStatus('error', 'err');
+    } finally {
+      state.currentTask = null;
+    }
+  }
+
   function showResult(html) {
     const r = $('#resultMsg');
     r.className = 'result-msg';
@@ -342,7 +450,10 @@ document.addEventListener('DOMContentLoaded', () => {
       title: res.title,
       channel: res.channel,
       quality: q.label,
-      url: q.url,
+      url: q.url || (q.selfhost ? (state.resolvedUrl || null) : null),
+      f: q.f || null,
+      selfhost: !!q.selfhost,
+      ext: q.ext || null,
       filename,
       thumb: res.thumb || null,
       size: q.size || null,
@@ -385,6 +496,24 @@ document.addEventListener('DOMContentLoaded', () => {
           '<button class="lib-icon-btn" data-act="del" title="delete record">&#128465;</button>' +
         '</div>';
       el.querySelector('[data-act="dl"]').addEventListener('click', () => {
+        // self-host record → re-download through the server using saved selector
+        if (it.selfhost && it.f) {
+          const sh = YTD.getSelfHostUrl();
+          if (!sh) { toast('Set your server URL first (Backend settings)'); return; }
+          const isAudio = /audio/i.test(it.quality || '');
+          const q = {
+            label: it.quality, sub: 'server re-download',
+            kind: isAudio ? 'audio' : 'video',
+            ext: it.ext || (isAudio ? 'm4a' : 'mp4'),
+            mime: isAudio ? 'audio/mp4' : 'video/mp4',
+            f: it.f, selfhost: true
+          };
+          state.resolved = { title: it.title, channel: it.channel, thumb: it.thumb, backend: 'selfhost', qualities: [q] };
+          state.resolvedUrl = it.url;
+          state.activeQuality = q;
+          doDownload();
+          return;
+        }
         const q = { label: it.quality, url: it.url, mime: it.url.includes('.webm') ? 'video/webm' : 'video/mp4' };
         state.resolved = { title: it.title, channel: it.channel, thumb: it.thumb, backend: it.backend, qualities: [q] };
         state.activeQuality = q;

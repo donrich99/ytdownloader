@@ -1,7 +1,9 @@
 /* ═══════════════════════════════════════════════════════════
-   API.JS — backend engine for ytdownloader (v2.2 COBALT V11)
+   API.JS — backend engine for ytdownloader (v2.3 SELFHOST)
    MULTI-BACKEND PARALLEL RESOLVER:
-     1. Cobalt v11    — ★ THE only living backend in 2026 ★
+     0. Self-host  — ★ GUARANTEED path ★ (sarili mong yt-dlp server)
+        (ytdlserve: your server downloads + merges via ffmpeg)
+     1. Cobalt v11    — legacy living backend
         (session auth via Cloudflare Turnstile, or custom Api-Key)
      2. Piped API     — legacy instances, ALL tried at once
      3. Invidious API — legacy instances, ALL tried at once
@@ -10,16 +12,16 @@
    KEY FIX (v2.1): instances are probed IN PARALLEL so the
    first working server wins within seconds.
    KEY UPGRADE (v2.2): in 2026 ALL public Piped/Invidious
-   instances are dead. The only living backend is Cobalt v11
-   (api.cobalt.tools, needs session Bearer token obtained via
-   Cloudflare Turnstile, or an Api-Key). If no auth is present,
-   the app falls back to opening cobalt.tools/?u=… (web UI,
-   which auto-solves its own Turnstile) so downloads ALWAYS work.
+   instances are dead. Cobalt v11 needs auth (Turnstile session
+   or Api-Key).
+   KEY UPGRADE (v2.3): YOUR OWN SERVER is the new king. Set the
+   server URL in settings → the app uses ytdlserve (yt-dlp +
+   ffmpeg server-side merge) = guaranteed downloads forever.
    ═══════════════════════════════════════════════════════════ */
 'use strict';
 
 const YTD = {
-  VERSION: '2.2.0',
+  VERSION: '2.3.0',
 
   /* ── backend instance pools ── */
   PIPED_INSTANCES: [
@@ -654,6 +656,18 @@ const YTD = {
 
     const errors = [];
 
+    /* ── SELF-HOST FIRST — sequential priority (guaranteed path) ──
+       Kapag may naka-set na server URL, subukan muna ito AGAD.
+       Kung gumana → i-return kaagad (no waiting for dead backends). */
+    if (YTD.getSelfHostUrl()) {
+      try {
+        const sh = await YTD.probeSelfHost(url);
+        if (sh && sh.qualities && sh.qualities.length) return sh;
+      } catch (e) {
+        errors.push('selfhost: ' + e.message);
+      }
+    }
+
     /* ── parallel probes: cobalt v11 + ALL piped + ALL invidious + jina at once ── */
     const probes = [];
 
@@ -840,6 +854,87 @@ const YTD = {
 
   setCobaltKey(k) {
     try { window.localStorage.setItem('ytd_cobalt_key', (k || '').trim()); } catch (e) {}
+  },
+
+  /* ═══════════════════════════════════════════════
+     SELF-HOSTED BACKEND — ytdlserve (sarili mong server)
+     Pag may server URL (settings), ang app ay gumagamit
+     nito bilang GUARANTEED na download path. Ang server
+     mismo ang nag-e-extract + nag-merge (yt-dlp+ffmpeg).
+     ═══════════════════════════════════════════════ */
+
+  getSelfHostUrl() {
+    try {
+      const u = (window.localStorage.getItem('ytd_selfhost_url') || '').trim();
+      return u ? u.replace(/\/+$/, '') : '';
+    } catch (e) { return ''; }
+  },
+
+  setSelfHostUrl(u) {
+    try { window.localStorage.setItem('ytd_selfhost_url', (u || '').trim()); } catch (e) {}
+  },
+
+  /* probe /api/v1/info — server extracts info + gives format selectors */
+  async probeSelfHost(url) {
+    const base = YTD.getSelfHostUrl();
+    if (!base) throw new Error('selfhost: not configured');
+    const info = await YTD.fetchJson(base + '/api/v1/info?url=' + encodeURIComponent(url), 25000);
+    if (!info || info.status === 'error') {
+      throw new Error('selfhost: ' + ((info && info.error && info.error.code) || 'bad response'));
+    }
+    const quals = (info.qualities || []).map((q, i) => ({
+      label: q.label || 'quality',
+      sub: q.sub || '',
+      kind: q.kind === 'audio' ? 'audio' : 'video',
+      ext: q.ext || (q.kind === 'audio' ? 'm4a' : 'mp4'),
+      mime: q.mime || (q.kind === 'audio' ? 'audio/mp4' : 'video/mp4'),
+      size: typeof q.size === 'number' ? Math.round(q.size * 1048576) : null, // MB → bytes
+      f: q.f || null,                 // yt-dlp format selector
+      selfhost: true,
+      key: 'sh-' + i
+    })).filter((q) => q.f);
+
+    if (!quals.length) throw new Error('selfhost: no qualities');
+    const id = info.id || YTD.extractYtId(url) || '';
+    return {
+      backend: 'selfhost', instance: base, id,
+      title: info.title || 'youtube video',
+      channel: info.channel || 'unknown',
+      duration: info.duration || '-', durationSec: 0,
+      thumb: info.thumb || 'https://i.ytimg.com/vi/' + id + '/hqdefault.jpg',
+      qualities: YTD.sortQualities(quals), raw: info
+    };
+  },
+
+  /* start a server-side download task → task_id */
+  async selfHostStart(url, q, filename) {
+    const base = YTD.getSelfHostUrl();
+    if (!base) throw new Error('selfhost: not configured');
+    const fn = String(filename || 'video').replace(/\.[^.]+$/, '');
+    const startUrl = base + '/api/v1/start?u=' + encodeURIComponent(url) +
+      '&f=' + encodeURIComponent(q.f || 'best') +
+      '&ext=' + encodeURIComponent(q.ext || 'mp4') +
+      '&fn=' + encodeURIComponent(fn);
+    const data = await YTD.fetchJson(startUrl, 20000);
+    if (!data || !data.task_id) {
+      throw new Error('server: ' + ((data && data.error && data.error.code) || 'no task'));
+    }
+    return data.task_id;
+  },
+
+  /* poll until done → absolute file URL */
+  async selfHostPoll(taskId, onUpdate) {
+    const base = YTD.getSelfHostUrl();
+    while (true) {
+      await new Promise((r) => setTimeout(r, 1250));
+      let p = null;
+      try {
+        p = await YTD.fetchJson(base + '/api/v1/progress/' + taskId, 12000);
+      } catch (e) { continue; } // transient → keep polling
+      if (onUpdate) onUpdate(p || {});
+      if (p && p.status === 'done' && p.file) return base + p.file;
+      if (p && p.status === 'error') throw new Error('server: ' + (p.error || 'failed'));
+    }
   },
 
   /* can the app talk to the cobalt API right now? */
