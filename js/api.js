@@ -658,13 +658,23 @@ const YTD = {
 
     /* ── SELF-HOST FIRST — sequential priority (guaranteed path) ──
        Kapag may naka-set na server URL, subukan muna ito AGAD.
-       Kung gumana → i-return kaagad (no waiting for dead backends). */
+       Kung gumana → i-return kaagad (no waiting for dead backends).
+       Kung patay ang server URL (nag-restart ang tunnel) →
+       i-refresh mula sa server.txt at subukan ulit. */
     if (YTD.getSelfHostUrl()) {
       try {
         const sh = await YTD.probeSelfHost(url);
         if (sh && sh.qualities && sh.qualities.length) return sh;
       } catch (e) {
         errors.push('selfhost: ' + e.message);
+        try {
+          const fresh = await YTD.fetchServerTxtUrl();
+          if (fresh && fresh !== YTD.getSelfHostUrl()) {
+            YTD.setSelfHostUrl(fresh);
+            const sh2 = await YTD.probeSelfHost(url);
+            if (sh2 && sh2.qualities && sh2.qualities.length) return sh2;
+          }
+        } catch (e2) { /* keep going */ }
       }
     }
 
@@ -872,6 +882,19 @@ const YTD = {
 
   setSelfHostUrl(u) {
     try { window.localStorage.setItem('ytd_selfhost_url', (u || '').trim()); } catch (e) {}
+  },
+
+  /* kumuha ng bagong server URL mula sa server.txt (kapag nag-restart ang tunnel) */
+  async fetchServerTxtUrl() {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 8000);
+      const r = await fetch('./server.txt?ts=' + Date.now(), { cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(t);
+      if (!r.ok) return '';
+      const u = (await r.text()).trim().replace(/\/+$/, '');
+      return /^https:\/\/.+\.trycloudflare\.com$/.test(u) ? u : '';
+    } catch (e) { return ''; }
   },
 
   /* probe /api/v1/info — server extracts info + gives format selectors */
