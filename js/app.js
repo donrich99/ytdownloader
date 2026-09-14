@@ -394,7 +394,7 @@ document.addEventListener('DOMContentLoaded', () => {
         $('#progressFill').style.width = pct + '%';
         termPct(pct);
         const spd = recv / Math.max(1, (Date.now() - state.currentTask._t0) / 1000);
-        $('#progressStats').innerHTML = fmtBytes(recv) + (total ? ' / ' + fmtBytes(total) : '') +
+        $('#progressStats').textContent = fmtBytes(recv) + (total ? ' / ' + fmtBytes(total) : '') +
           ' · ' + pct + '%' + ' · ' + fmtBytes(spd) + '/s';
       };
       await new Promise((resv, rej) => {
@@ -408,7 +408,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       $('#progressFill').style.width = '100%';
       $('#progressLabel').textContent = 'Done!';
+      termLog('[C++ WGET] transfer complete ✔', 'ok');
+      termLog('$ echo "DOWNLOAD COMPLETE" » exit code 0', 'cmd');
       recordDownload(res, q, filename, 'browser-download');
+      hide($('#progressPanel'));   // mawala ang terminal pagkatapos ng download
       showResult('<b>Download complete!</b><div class="dim">Check your browser download folder.</div>');
       setStatus('done — saved to downloads', 'green');
     } catch (err) {
@@ -475,8 +478,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (isApk && androidDownload(fileUrl, filename)) {
         toast('Download started — check your phone Download folder', 4200);
         recordDownload(res, q, filename, 'server-merge');
+        hide($('#progressPanel'));          // mawala ang terminal display pagkatapos mag-download
+        showResult('<b>Download complete!</b><div class="dim">Saved to your phone <b>/Download/ytdownloader</b> folder.</div>');
         setStatus('done — saved to phone /Download', 'green');
-        termLog('[C++ WGET] saved → /Download/' + filename, 'ok');
         return;
       }
 
@@ -505,6 +509,7 @@ document.addEventListener('DOMContentLoaded', () => {
       termLog('[C++ WGET] transfer complete ✔', 'ok');
       termLog('$ echo "DOWNLOAD COMPLETE" » exit code 0', 'cmd');
       recordDownload(res, q, filename, 'server-merge');
+      hide($('#progressPanel'));          // mawala ang terminal display pagkatapos mag-download
       showResult('<b>Download complete!</b><div class="dim">Merged on your server, saved to your downloads folder.</div>');
       setStatus('done — saved to downloads', 'green');
     } catch (err) {
