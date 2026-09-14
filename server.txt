@@ -1,1 +1,1 @@
-https://sell-writes-appropriations-monthly.trycloudflare.com
+https://api.trycloudflare.com
