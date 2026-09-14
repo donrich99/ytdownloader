@@ -73,7 +73,7 @@ document.addEventListener('DOMContentLoaded', () => {
   $$('.nav-btn').forEach(b => b.addEventListener('click', () => switchPage(b.dataset.page)));
 
   /* ── STATE ── */
-  const state = { resolved: null, resolvedUrl: null, activeQuality: null, currentTask: null };
+  const state = { resolved: null, resolvedUrl: null, activeQuality: null, currentTask: null, hasQualities: false };
 
   function setStatus(msg, cls) {
     const el = $('#statusLine');
@@ -215,6 +215,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide($('#progressPanel'));
     state.resolved = null;
     state.activeQuality = null;
+    state.hasQualities = false;
     resolveBtn.disabled = true;
     resolveBtn.textContent = 'Loading...';
     setStatus('resolving link, please wait...', '');
@@ -299,9 +300,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     state.activeQuality = state.activeQuality || first;
+    state.hasQualities = true;
     const sizes = qualities.filter(q => q.size).map(q => fmtBytes(q.size)).join(' | ');
     qn.textContent = sizes ? '// approx size: ' + sizes + ' //' : '// qualities found from available streams //';
-    if (state.activeQuality) toast('Pick a quality, then press download');
+    if (state.activeQuality) toast('Selected: ' + state.activeQuality.label + ' — press Download');
   }
 
   /* ── DOWNLOAD ── */
@@ -637,8 +639,17 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ── EVENTS ── */
-  resolveBtn.addEventListener('click', doResolve);
-  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') doResolve(); });
+  // Ang button ay may DALAWAHING papel:
+  //  • walang qualities pa  → RESOLVE (probe sa backends)
+  //  • may qualities na     → DOWNLOAD (gamitin ang napiling quality — HINDI na nag-re-probe)
+  function onPrimaryAction() {
+    if (state.hasQualities && state.resolved) doDownload();
+    else doResolve();
+  }
+  resolveBtn.addEventListener('click', onPrimaryAction);
+  urlInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') onPrimaryAction(); });
+  // kapag nag-edit ng link → bumalik sa resolve mode (mawala ang lumang qualities)
+  urlInput.addEventListener('input', () => { state.hasQualities = false; });
   $('#downloadAgainBtn').addEventListener('click', () => {
     hide($('#resultPanel'));
     hide($('#videoInfo'));
@@ -647,6 +658,7 @@ document.addEventListener('DOMContentLoaded', () => {
     hide($('#cobaltFallbackBtn'));
     state.resolved = null;
     state.activeQuality = null;
+    state.hasQualities = false;
     urlInput.value = '';
     urlInput.focus();
     setStatus('system: idle', '');
