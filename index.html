@@ -80,11 +80,24 @@
         <div class="term-note" id="qualityNote"></div>
       </div>
 
-      <!-- PROGRESS -->
+      <!-- PROGRESS — C++ terminal console -->
       <div id="progressPanel" class="hidden">
-        <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
-        <div class="progress-stats" id="progressStats"></div>
-        <div class="progress-label" id="progressLabel">downloading...</div>
+        <div class="cpp-term">
+          <div class="cpp-titlebar">
+            <span class="cpp-dot cpp-dot-r"></span><span class="cpp-dot cpp-dot-y"></span><span class="cpp-dot cpp-dot-g"></span>
+            <span class="cpp-title">C++ WGET v2.0 — ytdlserve console</span>
+            <span class="cpp-blink">▮</span>
+          </div>
+          <div class="cpp-body">
+            <div class="cpp-log" id="progressLog"></div>
+            <div class="cpp-progress-row">
+              <div class="cpp-label" id="progressLabel">downloading...</div>
+              <div class="cpp-pct" id="progressPct">0%</div>
+            </div>
+            <div class="cpp-track"><div class="cpp-fill" id="progressFill"></div></div>
+            <div class="cpp-stats" id="progressStats"></div>
+          </div>
+        </div>
       </div>
 
       <!-- RESULT -->

@@ -307,6 +307,37 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   /* ── DOWNLOAD ── */
+  /* C++ CONSOLE — log engine */
+  function termReset() {
+    const L = $('#progressLog');
+    if (L) L.innerHTML = '';
+    const P = $('#progressPct');
+    if (P) P.textContent = '0%';
+  }
+  function termLog(msg, cls) {
+    const L = $('#progressLog');
+    if (!L) return;
+    const d = document.createElement('span');
+    d.className = 'line ' + (cls || '');
+    d.textContent = msg;
+    L.appendChild(d);
+    while (L.children.length > 14) L.removeChild(L.firstChild);
+    L.scrollTop = L.scrollHeight;
+  }
+  function termPct(p) {
+    const P = $('#progressPct');
+    if (P) P.textContent = Math.max(0, Math.min(100, Math.round(p))) + '%';
+  }
+  const BOOT_LINES = [
+    ['$ g++ downloader.cpp -o ytd && ./ytd', 'cmd'],
+    ['[C++ WGET] linking core module ........ OK', 'ok'],
+    ['[C++ WGET] connecting to ytdlserve ...... OK', 'ok'],
+    ['[C++ WGET] acquiring stream handle ........', 'dim']
+  ];
+  function termBoot() {
+    termReset();
+    BOOT_LINES.forEach(([t, c], i) => setTimeout(() => termLog(t, c), 130 * i));
+  }
   function cleanFilename(title, ext) {
     let f = title.replace(/[\\/:*?"<>|#%&{}]/g, '_').replace(/\s+/g, '_').slice(0, 120);
     if (!f) f = 'ytdownload';
@@ -349,15 +380,18 @@ document.addEventListener('DOMContentLoaded', () => {
     setStatus('downloading — ' + filename, '');
     show($('#progressPanel'));
     hide($('#resultPanel'));
+    termBoot();
     $('#progressLabel').textContent = 'downloading ' + q.label + ' ...';
     $('#progressFill').style.width = '0%';
     $('#progressStats').textContent = '';
+    setTimeout(() => termLog('[C++ WGET] opening stream → device ........', 'dim'), 450);
     try {
       state.currentTask = YTD.downloadStream(q.url, filename);
       state.currentTask._t0 = Date.now();
       state.currentTask.onProgress = (recv, total) => {
         const pct = total ? Math.min(100, Math.round((recv / total) * 100)) : 0;
         $('#progressFill').style.width = pct + '%';
+        termPct(pct);
         const spd = recv / Math.max(1, (Date.now() - state.currentTask._t0) / 1000);
         $('#progressStats').innerHTML = fmtBytes(recv) + (total ? ' / ' + fmtBytes(total) : '') +
           ' · ' + pct + '%' + ' · ' + fmtBytes(spd) + '/s';
@@ -392,16 +426,32 @@ document.addEventListener('DOMContentLoaded', () => {
     setStatus('server: preparing download…', '');
     show($('#progressPanel'));
     hide($('#resultPanel'));
+    termBoot();
     $('#progressLabel').textContent = 'server is preparing ' + q.label + ' …';
     $('#progressFill').style.width = '0%';
     $('#progressStats').textContent = '';
+    setTimeout(() => termLog('[C++ WGET] requesting task from ytdlserve ........', 'dim'), 450);
     try {
       // 1) start server-side task (yt-dlp + ffmpeg on OUR server)
       const taskId = await YTD.selfHostStart(ytUrl, q, filename);
+      termLog('[C++ WGET] task acquired → ' + taskId.slice(0, 8) + '…', 'ok');
+      termLog(q.ext === 'mp3'
+        ? '[yt-dlp] fetching bestaudio → converting to MP3 320k ...'
+        : (q.ext === 'm4a' || q.kind === 'audio'
+          ? '[yt-dlp] fetching audio stream (AAC) ..........'
+          : '[yt-dlp] fetching video+audio streams ...'), 'dim');
       // 2) poll progress until the server finished downloading+merging
       let lastPct = -1;
+      let wasProcessing = false;
       const fileUrl = await YTD.selfHostPoll(taskId, (p) => {
         const pct = Math.max(0, Math.min(100, Math.round((p.progress || 0))));
+        termPct(pct);
+        if (pct > 5 && lastPct <= 5) termLog('[yt-dlp] streaming from YouTube .........', 'ok');
+        if (pct >= 50 && lastPct < 50) termLog(q.ext === 'mp3' ? '[ffmpeg] converting audio → MP3 320k ...' : '[ffmpeg] muxing video+audio streams ...', 'warn');
+        if (p.status === 'processing' && !wasProcessing) {
+          wasProcessing = true;
+          termLog('[ffmpeg] merging … please wait', 'dim');
+        }
         if (pct !== lastPct) {
           lastPct = pct;
           $('#progressFill').style.width = pct + '%';
@@ -415,12 +465,15 @@ document.addEventListener('DOMContentLoaded', () => {
       $('#progressLabel').textContent = 'downloading file…';
       $('#progressFill').style.width = '100%';
       $('#progressStats').textContent = 'server finished — receiving file…';
+      termPct(100);
+      termLog('[C++ WGET] merging complete ✔ payload ready', 'ok');
 
       // ANDROID — native bridge saves to real Download folder
       if (isApk && androidDownload(fileUrl, filename)) {
         toast('Download started — check your phone Download folder', 4200);
         recordDownload(res, q, filename, 'server-merge');
         setStatus('done — saved to phone /Download', 'green');
+        termLog('[C++ WGET] saved → /Download/' + filename, 'ok');
         return;
       }
 
@@ -430,6 +483,7 @@ document.addEventListener('DOMContentLoaded', () => {
       state.currentTask.onProgress = (recv, total) => {
         const pct = total ? Math.min(100, Math.round((recv / total) * 100)) : 0;
         $('#progressFill').style.width = pct + '%';
+        termPct(pct);
         const spd = recv / Math.max(1, (Date.now() - state.currentTask._t0) / 1000);
         $('#progressStats').innerHTML = fmtBytes(recv) + (total ? ' / ' + fmtBytes(total) : '') +
           ' · ' + pct + '%' + ' · ' + fmtBytes(spd) + '/s';
@@ -445,11 +499,14 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       $('#progressFill').style.width = '100%';
       $('#progressLabel').textContent = 'Done!';
+      termLog('[C++ WGET] transfer complete ✔', 'ok');
+      termLog('$ echo "DOWNLOAD COMPLETE" » exit code 0', 'cmd');
       recordDownload(res, q, filename, 'server-merge');
       showResult('<b>Download complete!</b><div class="dim">Merged on your server, saved to your downloads folder.</div>');
       setStatus('done — saved to downloads', 'green');
     } catch (err) {
       hide($('#progressPanel'));
+      termLog('[C++ WGET] transfer FAILED: ' + esc(err.message.slice(0, 80)), 'err');
       showResult('<b>Download failed:</b> ' + esc(err.message));
       setStatus('error', 'err');
     } finally {
