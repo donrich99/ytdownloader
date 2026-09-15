@@ -203,7 +203,7 @@
 <div id="turnstile-widget-2" aria-hidden="true" style="position:absolute;left:-9999px;top:0;width:300px;height:65px;overflow:hidden;"></div>
 
 <footer class="footer">
-  <span>ytdownloader v2.12 · built by <b>dvc</b> · 100% free · supported by your donations</span>
+  <span>ytdownloader v2.13 · built by <b>dvc</b> · 100% free · supported by your donations</span>
 </footer>
 
 <script src="js/polyfills.js"></script>
@@ -212,7 +212,7 @@
   // ?v=17 + updateViaCache:'none' → puwersahang i-fetch ang fresh SW script (bypass CDN cache)
   if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('service-worker.js?v=18', { updateViaCache: 'none' }).catch(function () {});
+      navigator.serviceWorker.register('service-worker.js?v=19', { updateViaCache: 'none' }).catch(function () {});
     });
   }
   window.addEventListener('beforeinstallprompt', function (e) {
@@ -223,5 +223,36 @@
 <script src="js/api.js"></script>
 <script src="js/db.js"></script>
 <script src="js/app.js"></script>
+<script>
+  // BOOT WATCHDOG (ES5) — insurance: kung sa anumang dahilan ay hindi
+  // natapos ang boot animation ng app.js (JS crash sa lumang WebView,
+  // network hang, atbp.), puwersahang tapusin ang boot screen para
+  // HINDI na mauulit ang "loading forever". 6s lang ang limit.
+  (function () {
+    var done = false;
+    function forceFinish() {
+      if (done) return;
+      done = true;
+      try {
+        var boot = document.getElementById('bootScreen');
+        var main = document.getElementById('mainApp');
+        if (boot) boot.classList.add('fade-out');
+        if (main) main.classList.remove('hidden');
+        setTimeout(function () {
+          if (boot) boot.style.display = 'none';
+        }, 600);
+      } catch (e) {}
+    }
+    function tryWatchdog() {
+      var boot = document.getElementById('bootScreen');
+      if (!boot) return;
+      var faded = boot.classList.contains('fade-out');
+      var hidden = boot.style.display === 'none';
+      if (!faded && !hidden) forceFinish();
+    }
+    setTimeout(tryWatchdog, 6000);
+    setTimeout(tryWatchdog, 12000);
+  })();
+</script>
 </body>
 </html>
